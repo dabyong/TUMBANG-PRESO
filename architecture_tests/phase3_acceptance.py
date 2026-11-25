@@ -57,10 +57,11 @@ def scenarios():
 
     initial_progress = {"unlockedProvinceIds": ["batanes"],
                         "completedProvinceIds": [], "records": {}}
-    failure = {"state": "Failure", "score": 100, "misses": 5, "stars": 0}
+    failure = {"state": "Failure", "score": 110, "misses": 5, "stars": 0}
     def failing_attempt(session):
         return [answer(1, "a", session),
                 *[answer(2, letter, session) for letter in "bcde"],
+                answer(2, "a", session),
                 answer(3, "b", session)]
 
     fail = failing_attempt("s1")

@@ -44,7 +44,7 @@ func _test_campaign(campaign: Dictionary) -> void:
     graph.routes[0].unlock = {}
     _contains(CampaignGraph.validate(graph), "requires unlock.allCompletedProvinceIds")
     graph.routes[0].unlock.allCompletedProvinceIds = ["isabela"]
-    graph.routes.append({"routeId": "alternate", "fromProvinceId": "batanes", "toProvinceId": "cagayan", "unlock": {"allCompletedProvinceIds": []}})
+    graph.routes.append({"routeId": "alternate", "fromProvinceId": "batanes", "toProvinceId": "cagayan", "travelMode": "sea", "unlock": {"allCompletedProvinceIds": []}})
     _assert(CampaignGraph.validate(graph).is_empty(), "alternative route resolves deadlock")
     graph.routes[2].routeId = graph.routes[0].routeId
     _contains(CampaignGraph.validate(graph), "duplicate routeId")

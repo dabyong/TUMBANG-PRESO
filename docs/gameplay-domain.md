@@ -1,0 +1,34 @@
+# Gameplay session contract
+
+`GameplayStore` owns the current snapshot. Use one serialized instance per save directory and call `restore()` before mutating it. The store returns an empty error string only after a mutation has been published and verified. It submits the previously observed generation with each write, so two sequentially used store instances cannot overwrite newer committed state from a stale snapshot.
+
+Start a session with a fresh ID, unlocked province, and a difficulty that has at least five approved questions. SHA-256 ranking derives five questions and each option order from the session ID, province, difficulty, and content fingerprint. The fingerprint covers the campaign and catalog, including question content versions. Recovery uses the saved ordering and requires the matching fingerprint. A catalog mismatch leaves the committed files available for recovery with compatible content. Session IDs are retained in the payload to prevent stale commands from matching a later attempt. This list grows with the number of started sessions.
+
+An answer carries the session ID, active question ID, option ID and a stable command ID. A rejected option stays disabled for that question. Accepted answers enter `Feedback` and block further submissions until the same answer command is acknowledged. A correct acknowledgement advances the question, and the fifth correct acknowledgement publishes victory and updates progression in the same snapshot. Incorrect acknowledgement leaves the question active. The fifth cumulative miss publishes failure with its feedback outcome immediately and preserves previous records. Stars and scores merge independently per province and difficulty. Campaign routes are evaluated using directed travel and completed prerequisites. An unlocked province still needs approved content for the selected difficulty.
+
+Payload version 1 carries the current session, used session IDs, and progression. Validation replays accepted submissions and their acknowledgements to check score, misses, rejected options, resolved answers, question index, and terminal state. It verifies that records and route access agree with completed provinces and that a victory's record covers its result.
+
+## Gameplay recovery decisions
+
+`restore()` reports the newest envelope-verified `committedGeneration`, the `snapshotGeneration` available from `snapshot()` for inspection, and `payloadIssues` keyed by generation. When the newest committed payload fails validation, the store enters `RECOVERY_REQUIRED` and lists compatible `recoveryCandidates` newest first. The newest candidate can be inspected without enabling gameplay. To explicitly restore a candidate, call `recover_committed(candidate_generation, committed_generation)` with the observed newest committed generation. The store revalidates the decision and republishes the selected payload under a new generation. An incompatible newest payload stays on disk and can also be recovered by restoring its matching content. With no compatible candidate, leave the store blocked and keep the files for repair or compatible content.
+
+An eligible staged save puts the store into `pending_recovery` and takes priority over committed recovery. Inspect the available committed snapshot and the stage's `stagedGeneration` and `stagedError`. Call `recover_staged(staged_generation)` to promote a compatible stage, or `defer_staged(staged_generation)` to archive the exact staged file without deleting it. Deferral resumes gameplay when the newest committed payload is valid. Otherwise, inspect the remaining recovery status before making a committed recovery decision. Starting a session, submitting an answer, and acknowledging feedback all remain blocked while a recovery decision is pending. Unsupported save-envelope schemas block both publication and recovery decisions.
+
+## Phase 3 adapter
+
+The Python executable bridge passes protocol version 1 requests to the headless GDScript adapter using a temporary directory. The adapter converts synthetic question fixtures to catalog records, namespaces IDs by province and difficulty, and passes the fixture's provided order through the store's validated selection API. Only the test adapter automatically acknowledges feedback. A restart drops and recreates the store from disk. The synthetic record suite calls the same record merge used for victories and persists its result through the repository.
+
+`midTempWrite` leaves a truncated pending file. `afterSlotWriteBeforeFeedback` leaves committed feedback awaiting acknowledgement. `afterTerminalCommitBeforeResults` stops after the verified victory write. For `corruptNewestSlot`, the adapter damages the numbered generations published by the latest logical fixture operation, which may include answer and acknowledgement writes. For `corruptBothSlots`, it damages all retained committed generations. These translations leave the repository's numbered-generation and explicit staged-recovery behavior intact.
+
+## Phase 3 failure fixture correction
+
+`failed-run-no-progress` and `replay-records-only-improve-on-success` use the same corrected failure sequence. After four misses on question two, the fixture submits the remaining correct answer and the adapter acknowledges it. Section 6 of the [Phase 2 GDD](phase-2-game-design-document.md#6-question-and-answer-mechanics) requires correct feedback acknowledgement before advancing. Question one earns 100 points, question two earns 10, and the first miss on question three ends the session with 110 points, five misses, and zero stars. Both scenarios still assert failure and the expected progression.
+
+The M2.1 remediation passed 55 foundation checks, 204 gameplay-domain checks, all 16 Phase 3 gameplay scenarios, and both record-merge scenarios on Godot 4.7.2.
+
+## Deferred technical work
+
+- `usedSessionIds` grows with every started session. A future payload version can use a persisted, monotonic session namespace with a migration plan that preserves stale-command rejection.
+- The fingerprint covers the whole campaign and catalog, so an unrelated province content edit can block a session restore. A future format can fingerprint session-specific question data and version campaign progression independently, with explicit compatibility validation and migration.
+- Automated interruption tests exercise staged publication and file corruption. Device testing on supported Android and iOS hardware should cover abrupt termination and physical power loss at each publication boundary and determine whether platform-level durability primitives are needed.
+- Production recovery UI is deferred. It should show the committed and staged diagnostics, distinguish promotion and deferral from committed fallback, require confirmation before rolling progress back, and offer an export path when recovery is unavailable.

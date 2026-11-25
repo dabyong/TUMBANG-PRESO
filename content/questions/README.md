@@ -6,4 +6,4 @@ The catalog declares `mode: "foundation"` for empty fixtures or `mode: "playable
 
 Approved records use `verificationStatus: "approved"`, one of `easy`, `normal`, or `hard`, and a `source` object with non-blank `title` and `reference` fields. A reference can be a URL or a bibliographic locator. Each of the five options supplies an `optionId` and visible `text`. Labels must be distinct after case and common whitespace normalization. Reviewers still verify facts and sources separately.
 
-Campaign route prerequisites use `unlock.allCompletedProvinceIds`. The validator treats routes as directed, with all listed completions required before a route becomes available from its source.
+Campaign routes declare `travelMode` as `land` or `sea`. Routes are directed, and `unlock.allCompletedProvinceIds` lists the known, unique province completions required before a route becomes available from its source. An empty list opens the route as soon as its source is accessible.

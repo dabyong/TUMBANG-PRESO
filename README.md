@@ -2,9 +2,9 @@
 
 Godot 4.7.2-stable foundation for an offline-first educational 2D province adventure.
 
-## Milestone 1 scope
+## Milestone 2.1 scope
 
-This branch contains the project shell, offline boot screen, data contracts, campaign validation, recoverable local-save foundation, automated foundation test entry point, asset policy, and mobile export preparation. It does not contain Batanes gameplay, province question content, or the restricted legacy music in a release path.
+The project provides an offline boot screen, campaign and question validation, and the gameplay session and save domain for the Batanes vertical slice. The bundled catalog is the empty foundation fixture. The automated gameplay suites use synthetic approved questions.
 
 ## Repository policy
 
@@ -20,14 +20,16 @@ main is the stable release branch. develop is the integration branch for approve
 
 From the repository root:
 
-    godot --headless --path . --editor --quit
+    godot --headless --path . --import
     godot --headless --path . --script res://tests/foundation_test.gd
+    godot --headless --path . --script res://tests/gameplay_domain_test.gd
+    python3 architecture_tests/phase3_acceptance.py --adapter python3 architecture_tests/phase3_adapter.py
+    python3 architecture_tests/phase3_acceptance.py --domain-adapter python3 architecture_tests/phase3_adapter.py
 
-The first command verifies project import. The second runs campaign, content, save recovery, and offline boot checks. CI also confirms that an intentional failed check exits with status 1 and verifies the clean mobile staging project.
+Use Python 3 and put Godot on the path or set `GODOT` to the headless executable. CI also confirms that an intentional failed check exits with status 1 and verifies the clean mobile staging project. The gameplay contract documents two open conflicts in the Phase 3 fixture that currently cause its strict gameplay command to exit 1.
 
 - [Local persistence contract](docs/save-foundation.md)
+- [Gameplay session and Phase 3 adapter](docs/gameplay-domain.md)
 - [Mobile export procedure and prerequisites](docs/mobile-export.md)
 - [Asset handling and provenance](assets/README.md)
 - [Authoritative Phase 2 Game Design Document](docs/phase-2-game-design-document.md)
-
-Milestone 2 begins only after explicit approval.

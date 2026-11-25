@@ -3,6 +3,7 @@ extends RefCounted
 
 const SCHEMA_VERSION := 2
 const MAX_GENERATION := 9007199254740991
+const RETAIN_COMMITTED := 3
 const PREFIX := "tp-save-"
 const LEGACY := ["save-a.json", "save-b.json", "save-next.tmp"]
 enum Status { FIRST_LAUNCH, READY, RECOVERED, RECOVERY_REQUIRED, UNREADABLE }
@@ -18,6 +19,7 @@ func load_latest() -> Dictionary:
     var result := {
         "status": Status.FIRST_LAUNCH, "snapshot": {}, "issues": {},
         "stagedGeneration": 0, "highestGeneration": 0, "writeBlocked": false,
+        "verifiedCommitted": [],
     }
     var dir := DirAccess.open(_directory)
     if dir == null or dir.list_dir_begin() != OK:
@@ -26,6 +28,7 @@ func load_latest() -> Dictionary:
         return result
     var latest := 0
     var staged := 0
+    var highest_published := 0
     var filename := dir.get_next()
     while not filename.is_empty():
         if LEGACY.has(filename):
@@ -34,6 +37,8 @@ func load_latest() -> Dictionary:
             var pending := filename.ends_with(".pending")
             var generation := _generation_from_name(filename)
             result.highestGeneration = maxi(result.highestGeneration, generation)
+            if not pending:
+                highest_published = maxi(highest_published, generation)
             if generation == 0 or dir.current_is_dir():
                 result.issues[filename] = "invalid_entry"
             else:
@@ -44,37 +49,49 @@ func load_latest() -> Dictionary:
                         result.writeBlocked = true
                 elif pending:
                     staged = maxi(staged, generation)
-                elif generation > latest:
-                    latest = generation
-                    result.snapshot = entry
+                else:
+                    result.verifiedCommitted.append(generation)
+                    if generation > latest:
+                        latest = generation
+                        result.snapshot = entry
         filename = dir.get_next()
     dir.list_dir_end()
-    if staged > latest:
+    if staged > highest_published:
         result.stagedGeneration = staged
+    elif staged > 0:
+        result.issues[_filename(staged, true)] = "stale_stage"
     if result.writeBlocked or (latest == 0 and (staged > 0 or not result.issues.is_empty())):
         result.status = Status.RECOVERY_REQUIRED
     elif latest > 0:
-        result.status = Status.RECOVERED if staged > latest or not result.issues.is_empty() else Status.READY
+        result.status = Status.RECOVERED if result.stagedGeneration > 0 or not result.issues.is_empty() else Status.READY
     return result
 
 # Caller serializes writes and submits one complete, JSON-compatible snapshot.
-func save(payload: Dictionary) -> bool:
+func save(payload: Dictionary, expected_generation: int = -1) -> bool:
+    return publish(payload, expected_generation) > 0
+
+# Returns the generation verified after publication, or zero on failure.
+func publish(payload: Dictionary, expected_generation: int = -1) -> int:
     var current := load_latest()
     if current.writeBlocked or current.status == Status.RECOVERY_REQUIRED or current.stagedGeneration > 0:
-        return false
+        return 0
+    if expected_generation >= 0 and current.snapshot.get("generation", 0) != expected_generation:
+        return 0
     var generation := int(current.highestGeneration) + 1
     if generation > MAX_GENERATION:
-        return false
+        return 0
     var body := JSON.stringify({"schemaVersion": SCHEMA_VERSION, "generation": generation, "payload": payload}, "", true, true)
     var filename := _filename(generation, true)
+    if FileAccess.file_exists(_directory.path_join(filename)) or DirAccess.dir_exists_absolute(_directory.path_join(filename)):
+        return 0
     var file := FileAccess.open(_directory.path_join(filename), FileAccess.WRITE)
     if file == null:
-        return false
+        return 0
     file.store_string(JSON.stringify({"body": body, "sha256": body.sha256_text()}))
     file.flush()
     var write_error := file.get_error()
     file.close()
-    return write_error == OK and _commit(generation)
+    return generation if write_error == OK and _commit(generation) else 0
 
 func recover_staged(generation: int) -> bool:
     var current := load_latest()
@@ -88,7 +105,30 @@ func _commit(generation: int) -> bool:
         return false
     if _read_snapshot(staged, generation).has("error") or dir.rename(staged, committed) != OK:
         return false
-    return not _read_snapshot(committed, generation).has("error")
+    if _read_snapshot(committed, generation).has("error"):
+        return false
+    _prune_committed(dir)
+    return true
+
+func _prune_committed(dir: DirAccess) -> void:
+    var current := load_latest()
+    if current.writeBlocked:
+        return
+    var generations: Array = current.verifiedCommitted
+    generations.sort()
+    for index in range(generations.size() - RETAIN_COMMITTED):
+        var generation: int = generations[index]
+        var filename := _filename(generation, false)
+        if not _read_snapshot(filename, generation).has("error"):
+            _remove_committed(dir, filename)
+
+func _remove_committed(dir: DirAccess, filename: String) -> Error:
+    return dir.remove(filename)
+
+func read_staged(generation: int) -> Dictionary:
+    if generation <= 0:
+        return {"error": "invalid_generation"}
+    return _read_snapshot(_filename(generation, true), generation)
 
 func _read_snapshot(filename: String, generation: int) -> Dictionary:
     var file := FileAccess.open(_directory.path_join(filename), FileAccess.READ)
@@ -106,10 +146,12 @@ func _read_snapshot(filename: String, generation: int) -> Dictionary:
     if parser.parse(body) != OK:
         return {"error": "invalid_snapshot"}
     var snapshot: Variant = parser.data
-    if not snapshot is Dictionary or snapshot.get("generation") != generation or not snapshot.get("payload") is Dictionary:
+    if not snapshot is Dictionary or snapshot.get("generation") != generation:
         return {"error": "invalid_snapshot"}
     if snapshot.get("schemaVersion") != SCHEMA_VERSION:
         return {"error": "unsupported_schema"}
+    if not snapshot.get("payload") is Dictionary:
+        return {"error": "invalid_snapshot"}
     return snapshot
 
 func _generation_from_name(filename: String) -> int:

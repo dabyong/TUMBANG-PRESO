@@ -31,7 +31,7 @@ static func validate_catalog(catalog: Dictionary, campaign: Dictionary) -> Packe
             errors.append("question must be an object")
             continue
         var id: Variant = question.get("questionId")
-        if not _non_blank(id):
+        if not valid_id(id):
             errors.append("questionId is required")
             continue
         if by_id.has(id):
@@ -61,7 +61,7 @@ static func validate_catalog(catalog: Dictionary, campaign: Dictionary) -> Packe
                 errors.append("%s has a non-object option" % id)
                 continue
             var option_id: Variant = option.get("optionId")
-            if not _non_blank(option_id) or option_ids.has(option_id):
+            if not valid_id(option_id) or option_ids.has(option_id):
                 errors.append("%s has invalid or duplicate option IDs" % id)
             else:
                 option_ids[option_id] = true
@@ -98,7 +98,7 @@ static func validate_catalog(catalog: Dictionary, campaign: Dictionary) -> Packe
                 has_start_pool = true
             var used := {}
             for question_id in pool:
-                if not _non_blank(question_id) or used.has(question_id) or not by_id.has(question_id):
+                if not valid_id(question_id) or used.has(question_id) or not by_id.has(question_id):
                     errors.append("%s has an invalid, duplicate or unknown question ID: %s" % [context, question_id])
                     continue
                 used[question_id] = true
@@ -111,3 +111,6 @@ static func validate_catalog(catalog: Dictionary, campaign: Dictionary) -> Packe
 
 static func _non_blank(value: Variant) -> bool:
     return value is String and not value.strip_edges().is_empty()
+
+static func valid_id(value: Variant) -> bool:
+    return _non_blank(value) and value == value.strip_edges() and not value.contains("\n") and not value.contains("\r")

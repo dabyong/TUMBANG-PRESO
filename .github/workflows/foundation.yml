@@ -18,13 +18,24 @@ jobs:
           version: 4.7.2
           use-dotnet: false
       - name: Import project
-        run: godot --headless --path . --editor --quit
+        shell: bash
+        run: |
+          godot --headless --path . --import 2>&1 | tee import.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' import.log; then exit 1; fi
       - name: Run foundation tests
         shell: bash
         run: |
           godot --headless --path . --script res://tests/foundation_test.gd 2>&1 | tee foundation.log
           grep -Eq '^Foundation checks: [1-9][0-9]* passed, 0 failed$' foundation.log
           if grep -Eq 'SCRIPT ERROR|^ERROR:' foundation.log; then exit 1; fi
+      - name: Run gameplay-domain tests
+        shell: bash
+        run: |
+          godot --headless --path . --script res://tests/gameplay_domain_test.gd 2>&1 | tee gameplay.log
+          grep -Eq '^Gameplay checks: [1-9][0-9]* passed, 0 failed$' gameplay.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' gameplay.log; then exit 1; fi
+      - name: Run Phase 3 record merge acceptance
+        run: python3 architecture_tests/phase3_acceptance.py --domain-adapter python3 architecture_tests/phase3_adapter.py
       - name: Verify failed assertions fail the job
         shell: bash
         run: |
@@ -40,6 +51,8 @@ jobs:
           python3 tools/stage_mobile_release.py "$stage"
           test -z "$(find "$stage" -type f -iname '*.mp3' -print -quit)"
           test ! -e "$stage/assets"
-          godot --headless --path "$stage" --editor --quit 2>&1 | tee stage.log
+          godot --headless --path "$stage" --import 2>&1 | tee stage.log
           godot --headless --path "$stage" --quit-after 3 2>&1 | tee -a stage.log
           if grep -Eq 'SCRIPT ERROR|^ERROR:' stage.log; then exit 1; fi
+      - name: Run Phase 3 gameplay acceptance
+        run: python3 architecture_tests/phase3_acceptance.py --adapter python3 architecture_tests/phase3_adapter.py

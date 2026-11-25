@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {"assetId": "legacy-bg-scenery", "filename": "bg-scenery.png", "category": "art", "origin": "historical repository asset", "creationType": "ai-generated", "commercialUse": "review-required", "releaseStatus": "reference-only"},
+    {"assetId": "legacy-tsinelas-1", "filename": "tsinelas-1.png", "category": "art", "origin": "historical repository asset", "creationType": "ai-generated", "commercialUse": "review-required", "releaseStatus": "reference-only"},
+    {"assetId": "legacy-sakura-girl-yay", "filename": "Sakura-Girl-Yay-chosic.com_.mp3", "category": "music", "origin": "third-party track", "creationType": "human-created", "commercialUse": "restricted-non-commercial", "releaseStatus": "excluded-from-commercial-build"}
+  ],
+  "policy": "Every production asset requires provenance, permissions, and release approval before shipping."
+}
+

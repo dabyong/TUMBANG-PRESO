@@ -1,0 +1,23 @@
+name: Godot Foundation
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+      - name: Import project
+        run: godot --headless --path . --editor --quit
+      - name: Run foundation tests
+        run: godot --headless --path . --script res://tests/foundation_test.gd
+

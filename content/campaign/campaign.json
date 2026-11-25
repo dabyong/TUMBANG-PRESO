@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "campaignVersion": 1,
+  "startProvinceId": "batanes",
+  "chapters": [{"chapterId": "northern_luzon", "displayName": "Northern Luzon"}],
+  "provinces": [
+    {"provinceId": "batanes", "displayName": "Batanes", "regionName": "Cagayan Valley", "chapterId": "northern_luzon", "questionPools": {"easy": [], "normal": [], "hard": []}},
+    {"provinceId": "cagayan", "displayName": "Cagayan", "regionName": "Cagayan Valley", "chapterId": "northern_luzon", "questionPools": {"easy": [], "normal": [], "hard": []}},
+    {"provinceId": "isabela", "displayName": "Isabela", "regionName": "Cagayan Valley", "chapterId": "northern_luzon", "questionPools": {"easy": [], "normal": [], "hard": []}}
+  ],
+  "routes": [
+    {"routeId": "batanes_to_cagayan", "fromProvinceId": "batanes", "toProvinceId": "cagayan", "travelMode": "sea", "unlock": {"allCompletedProvinceIds": ["batanes"]}},
+    {"routeId": "cagayan_to_isabela", "fromProvinceId": "cagayan", "toProvinceId": "isabela", "travelMode": "land", "unlock": {"allCompletedProvinceIds": ["cagayan"]}}
+  ]
+}
+

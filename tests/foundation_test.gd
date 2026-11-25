@@ -11,8 +11,8 @@ func _initialize() -> void:
     call_deferred("_run")
 
 func _run() -> void:
-    var campaign := _read_json("res://content/campaign/campaign.json")
-    var questions := _read_json("res://content/questions/catalog.json")
+    var campaign := _read_json("res://tests/fixtures/foundation_campaign.json")
+    var questions := _read_json("res://tests/fixtures/foundation_catalog.json")
     _assert(CampaignGraph.validate(campaign).is_empty(), "campaign fixture validates")
     _assert(ContentValidator.validate_catalog(questions, campaign).is_empty(), "empty foundation catalog validates")
     _test_campaign(campaign)
@@ -26,9 +26,16 @@ func _run() -> void:
 
 func _boot_smoke() -> void:
     var scene: Node = load("res://scenes/boot.tscn").instantiate()
+    var directory := "user://boot-smoke-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
+    if DirAccess.make_dir_absolute(directory) != OK:
+        _assert(false, "isolated boot save directory can be created")
+        scene.free()
+        return
+    scene.save_directory = directory
     root.add_child(scene)
-    _assert(scene.get_node("Content/Status").text.begins_with("Offline foundation ready"), "bundled content boots offline")
+    _assert(not scene.get_node("Content/Play").disabled and scene.get_node("Content/Status").text == "Offline play available", "bundled content boots offline")
     scene.free()
+    DirAccess.remove_absolute(directory)
 
 func _test_campaign(campaign: Dictionary) -> void:
     var graph := campaign.duplicate(true)

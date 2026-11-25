@@ -4,6 +4,20 @@ extends RefCounted
 const DIFFICULTIES := ["easy", "normal", "hard"]
 const MIN_POOL_SIZE := 5
 
+static func validate_production(catalog: Dictionary, campaign: Dictionary) -> PackedStringArray:
+    var errors := validate_catalog(catalog, campaign)
+    if not errors.is_empty():
+        return errors
+    if catalog.mode != "playable" or not valid_id(catalog.get("contentVersion")):
+        errors.append("production requires a playable, versioned catalog")
+    for province in campaign.provinces:
+        if province.provinceId != campaign.get("startProvinceId"):
+            continue
+        for difficulty in DIFFICULTIES:
+            if province.questionPools[difficulty].size() < MIN_POOL_SIZE:
+                errors.append("production requires five approved questions in %s/%s" % [province.provinceId, difficulty])
+    return errors
+
 static func validate_catalog(catalog: Dictionary, campaign: Dictionary) -> PackedStringArray:
     var errors := PackedStringArray()
     if catalog.get("schemaVersion") != 1:

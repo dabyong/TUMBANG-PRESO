@@ -1,10 +1,65 @@
 {
   "schemaVersion": 1,
-  "campaignVersion": 1,
+  "campaignVersion": 2,
   "startProvinceId": "batanes",
   "chapters": [{"chapterId": "northern_luzon", "displayName": "Northern Luzon"}],
   "provinces": [
-    {"provinceId": "batanes", "displayName": "Batanes", "regionName": "Cagayan Valley", "chapterId": "northern_luzon", "questionPools": {"easy": [], "normal": [], "hard": []}},
+    {
+      "provinceId": "batanes", "displayName": "Batanes", "regionName": "Cagayan Valley", "chapterId": "northern_luzon",
+      "questionPools": {
+        "easy": [
+          "batanes-capital",
+          "batanes-frontier",
+          "batanes-region",
+          "batanes-lighthouse",
+          "batanes-boulder-beach",
+          "batanes-iraya",
+          "batanes-people",
+          "batanes-house-walls",
+          "batanes-dibang",
+          "batanes-lunis",
+          "batanes-annexation",
+          "batanes-dangat",
+          "batanes-sabtang",
+          "batanes-pop-count",
+          "batanes-vakul"
+        ],
+        "normal": [
+          "batanes-naidi",
+          "batanes-island-batan",
+          "batanes-inhabited-set",
+          "batanes-eastern-ocean",
+          "batanes-payaman",
+          "batanes-tukon",
+          "batanes-house-roof",
+          "batanes-kulay",
+          "batanes-uvud",
+          "batanes-vunung",
+          "batanes-kabaya",
+          "batanes-casa",
+          "batanes-bisumi-war",
+          "batanes-vur-festival",
+          "batanes-stone-islets"
+        ],
+        "hard": [
+          "batanes-bashi",
+          "batanes-balintang",
+          "batanes-census-uyugan",
+          "batanes-island-slope",
+          "batanes-ijang",
+          "batanes-tataya",
+          "batanes-pawpaw",
+          "batanes-venes",
+          "batanes-uvi",
+          "batanes-casa-stone",
+          "batanes-casa-assault",
+          "batanes-rotc",
+          "batanes-sabtang-battle",
+          "batanes-dampier",
+          "batanes-valugan-name"
+        ]
+      }
+    },
     {"provinceId": "cagayan", "displayName": "Cagayan", "regionName": "Cagayan Valley", "chapterId": "northern_luzon", "questionPools": {"easy": [], "normal": [], "hard": []}},
     {"provinceId": "isabela", "displayName": "Isabela", "regionName": "Cagayan Valley", "chapterId": "northern_luzon", "questionPools": {"easy": [], "normal": [], "hard": []}}
   ],

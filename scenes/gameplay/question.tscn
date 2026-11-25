@@ -1,0 +1,17 @@
+[gd_scene format=3]
+
+
+[node name="Question" type="VBoxContainer"]
+theme_override_constants/separation = 5
+
+[node name="Context" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+text = "Batanes"
+
+[node name="Prompt" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+autowrap_mode = 3
+text = "Question"

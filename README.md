@@ -23,7 +23,11 @@ From the repository root:
     godot --headless --path . --editor --quit
     godot --headless --path . --script res://tests/foundation_test.gd
 
-The first command verifies project import. The second runs schema, campaign, and save checks. Android and iOS exports require platform SDKs and signing configuration. Preparation is not a completed device build.
+The first command verifies project import. The second runs campaign, content, save recovery, and offline boot checks. CI also confirms that an intentional failed check exits with status 1 and verifies the clean mobile staging project.
+
+- [Local persistence contract](docs/save-foundation.md)
+- [Mobile export procedure and prerequisites](docs/mobile-export.md)
+- [Asset handling and provenance](assets/README.md)
+- [Authoritative Phase 2 Game Design Document](docs/phase-2-game-design-document.md)
 
 Milestone 2 begins only after explicit approval.
-

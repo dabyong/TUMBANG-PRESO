@@ -9,6 +9,7 @@ on:
 jobs:
   foundation:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Install Godot 4.7.2
@@ -19,5 +20,26 @@ jobs:
       - name: Import project
         run: godot --headless --path . --editor --quit
       - name: Run foundation tests
-        run: godot --headless --path . --script res://tests/foundation_test.gd
-
+        shell: bash
+        run: |
+          godot --headless --path . --script res://tests/foundation_test.gd 2>&1 | tee foundation.log
+          grep -Eq '^Foundation checks: [1-9][0-9]* passed, 0 failed$' foundation.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' foundation.log; then exit 1; fi
+      - name: Verify failed assertions fail the job
+        shell: bash
+        run: |
+          status=0
+          godot --headless --path . --script res://tests/foundation_test.gd -- --self-test-failure > probe.log 2>&1 || status=$?
+          test "$status" -eq 1
+          grep -q 'FAIL: intentional exit-code probe' probe.log
+          grep -Eq '^Foundation checks: [1-9][0-9]* passed, 1 failed$' probe.log
+      - name: Verify clean mobile export staging project
+        shell: bash
+        run: |
+          stage="$RUNNER_TEMP/tumbang-mobile"
+          python3 tools/stage_mobile_release.py "$stage"
+          test -z "$(find "$stage" -type f -iname '*.mp3' -print -quit)"
+          test ! -e "$stage/assets"
+          godot --headless --path "$stage" --editor --quit 2>&1 | tee stage.log
+          godot --headless --path "$stage" --quit-after 3 2>&1 | tee -a stage.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' stage.log; then exit 1; fi

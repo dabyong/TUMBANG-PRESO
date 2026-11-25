@@ -9,8 +9,8 @@ class FailingRepository extends Repository:
     var deny_cleanup := false
     var cleanup_attempts := 0
 
-    func publish(payload: Dictionary, expected_generation: int = -1) -> int:
-        return 0 if deny_save else super.publish(payload, expected_generation)
+    func publish(payload: Dictionary, expected_generation: int = -1, validate_payload: Callable = Callable()) -> int:
+        return 0 if deny_save else super.publish(payload, expected_generation, validate_payload)
 
     func _remove_committed(dir: DirAccess, filename: String) -> Error:
         cleanup_attempts += 1
@@ -36,6 +36,8 @@ func _run() -> void:
     _make_catalog()
     _test_session()
     _test_payload()
+    _test_committed_recovery()
+    _test_pending_recovery()
     _test_retention()
     _cleanup()
     print("Gameplay checks: %d passed, %d failed" % [_checks - _failures, _failures])
@@ -217,6 +219,98 @@ func _test_payload() -> void:
     _stage(repo, compatible_generation + 2, Repository.SCHEMA_VERSION, feedback)
     _check(store.recover_staged(compatible_generation + 2) == "" and store.snapshot() == feedback, "valid staged gameplay recovers session and progression together")
 
+func _test_committed_recovery() -> void:
+    var repo := Repository.new(_directory("committed-recovery"))
+    var store := Store.new(repo, _campaign, _catalog)
+    store.restore()
+    if store.start_session("recover", "batanes", "normal") != "":
+        _check(false, "committed recovery fixture started")
+        return
+    var good := store.snapshot()
+    var first: String = good.session.questionIds[0]
+    var incompatible := good.duplicate(true)
+    incompatible.session.catalogVersion = "older-catalog"
+    _write_snapshot(repo, "json", 2, Repository.SCHEMA_VERSION, incompatible)
+    _write_snapshot(repo, "json", 3, Repository.SCHEMA_VERSION, null)
+    var malformed := good.duplicate(true)
+    malformed.session.score = 100
+    _write_snapshot(repo, "json", 4, Repository.SCHEMA_VERSION, malformed)
+    var loaded := store.restore()
+    _check(repo.load_latest().snapshot.generation == 4, "envelope verifies independently of the gameplay payload")
+    _check(loaded.status == Repository.Status.RECOVERY_REQUIRED and loaded.error == "inconsistent_session", "invalid newest gameplay enters explicit recovery")
+    _check(loaded.committedGeneration == 4 and loaded.snapshotGeneration == 1 and loaded.recoveryCandidates == [1], "finds the only compatible committed candidate behind three invalid payloads")
+    _check(loaded.payloadIssues.get(2) == "catalog_version_mismatch" and loaded.payloadIssues.get(3) == "invalid_gameplay_payload", "diagnoses incompatible and non-object history")
+    _check(store.snapshot() == good, "exposes the older snapshot for inspection during recovery")
+    _check(store.start_session("blocked", "batanes", "normal") == "inconsistent_session", "committed recovery blocks start")
+    _check(store.submit_answer("recover", first, "a", "blocked") == "inconsistent_session", "committed recovery blocks answer")
+    _check(store.acknowledge_feedback("recover", "blocked") == "inconsistent_session", "committed recovery blocks acknowledgement")
+    _check(store.recover_committed(1, 3) == "stale_recovery_decision", "stale committed recovery decision is rejected")
+    _check(store.recover_committed(2, 4) == "ineligible_committed", "incompatible candidate cannot be selected")
+    _check(repo.load_latest().highestGeneration == 4, "unresolved and rejected decisions leave generations intact")
+    _check(store.recover_committed(1, 4) == "", "explicit selection republishes committed fallback")
+    loaded = store.restore()
+    _check(loaded.error == "" and loaded.committedGeneration == 5 and store.snapshot() == good, "explicit recovery publishes above invalid history")
+    _check(repo.load_latest().verifiedCommitted == [5, 4, 3, 2, 1], "recovery retains the only original semantic fallback and invalid generations")
+    _check(store.submit_answer("recover", first, "a", "right") == "", "gameplay resumes after committed recovery")
+    _check(store.acknowledge_feedback("recover", "right") == "", "gameplay can advance after committed recovery")
+    _check(repo.load_latest().verifiedCommitted == [7, 6, 5, 4, 3, 2], "retention counts three valid gameplay generations and leaves invalid or incompatible history")
+
+    _write_snapshot(repo, "json", 8, Repository.SCHEMA_VERSION, incompatible)
+    loaded = store.restore()
+    _check(loaded.error == "catalog_version_mismatch" and loaded.recoveryCandidates == [7, 6, 5], "incompatible newest remains blocked and offers all compatible candidates newest first")
+    _check(repo.load_latest().highestGeneration == 8, "incompatible newer snapshot remains on disk")
+    _stage(repo, 9, Repository.SCHEMA_VERSION, store.snapshot())
+    _check(store.restore().error == "pending_recovery" and store.defer_staged(9) == "", "staged decision precedes committed recovery")
+    _check(store.restore().error == "catalog_version_mismatch" and repo.load_latest().snapshot.generation == 8, "deferring stage leaves unresolved committed recovery blocked")
+    _stage(repo, 10, Repository.SCHEMA_VERSION + 1, {})
+    _check(store.restore().error == "unsupported_save_schema", "future envelope schema takes priority over semantic recovery")
+    _check(store.recover_committed(7, 8) == "unsupported_save_schema", "future envelope prevents committed recovery publication")
+    _check(store.recover_staged(10) == "unsupported_save_schema" and store.defer_staged(10) == "unsupported_save_schema", "future envelope prevents staged decisions")
+    _check(repo.load_latest().highestGeneration == 10, "future data is preserved")
+
+func _test_pending_recovery() -> void:
+    var repo := Repository.new(_directory("pending-recovery"))
+    var store := Store.new(repo, _campaign, _catalog)
+    store.restore()
+    if store.start_session("pending", "batanes", "normal") != "":
+        _check(false, "pending recovery fixture started")
+        return
+    var first: String = store.snapshot().session.questionIds[0]
+    if store.submit_answer("pending", first, "a", "right") != "":
+        _check(false, "pending recovery fixture in feedback")
+        return
+    var feedback := store.snapshot()
+    _stage(repo, 3, Repository.SCHEMA_VERSION, feedback)
+    var loaded := store.restore()
+    _check(loaded.status == Repository.Status.RECOVERY_REQUIRED and loaded.error == "pending_recovery", "eligible stage reports explicit recovery state")
+    _check(loaded.stagedGeneration == 3 and loaded.stagedError == "" and loaded.snapshotGeneration == 2 and store.snapshot() == feedback, "pending recovery keeps committed feedback inspectable")
+    _check(store.start_session("blocked", "batanes", "normal") == "pending_recovery", "pending recovery blocks session start")
+    _check(store.submit_answer("pending", first, "b", "blocked") == "pending_recovery", "pending recovery blocks answer submission")
+    _check(store.acknowledge_feedback("pending", "right") == "pending_recovery", "pending recovery blocks valid acknowledgement")
+    _check(store.recover_committed(1, 2) == "pending_recovery", "pending stage must be resolved before committed rollback")
+    _check(store.recover_staged(2) == "ineligible_stage" and store.defer_staged(2) == "ineligible_stage", "stale stage choices cannot change the active decision")
+    _check(store.recover_staged(3) == "" and store.acknowledge_feedback("pending", "right") == "", "explicit promotion resumes gameplay")
+    _check(repo.load_latest().snapshot.generation == 4, "promotion and feedback acknowledgement advance generations")
+
+    _stage(repo, 5, Repository.SCHEMA_VERSION, store.snapshot())
+    _stage(repo, 6, Repository.SCHEMA_VERSION, ["bad gameplay payload"])
+    var path := repo._directory.path_join("tp-save-6.pending")
+    var contents := FileAccess.get_file_as_bytes(path)
+    loaded = store.restore()
+    _check(loaded.error == "pending_recovery" and loaded.stagedError == "invalid_gameplay_payload", "checksum-valid malformed stage still requires a decision")
+    _check(store.recover_staged(6) == "invalid_gameplay_payload" and FileAccess.get_file_as_bytes(path) == contents, "failed promotion preserves staged bytes")
+    _check(store.defer_staged(6) == "", "explicit deferral archives the unpromotable stage")
+    _check(store.restore().error == "" and repo.load_latest().stagedGeneration == 0, "deferral keeps committed data and does not offer a superseded stage")
+    _check(FileAccess.get_file_as_bytes(repo._directory.path_join("tp-save-6.deferred")) == contents and FileAccess.file_exists(repo._directory.path_join("tp-save-5.pending")), "deferred and superseded staged files remain available")
+    _check(store.start_session("next", "batanes", "normal") == "" and repo.load_latest().snapshot.generation == 7, "play resumes after deferral and numbering skips deferred generations")
+
+    var orphan_repo := Repository.new(_directory("deferred-only"))
+    var orphan := Store.new(orphan_repo, _campaign, _catalog)
+    _stage(orphan_repo, 1, Repository.SCHEMA_VERSION, {})
+    _check(orphan.restore().error == "pending_recovery" and orphan.snapshot().is_empty(), "staged-only recovery offers no fabricated initial progress")
+    _check(orphan.defer_staged(1) == "" and orphan.restore().error == "save_recovery_required", "deferral without committed data still requires recovery")
+    _check(orphan.start_session("blocked", "batanes", "normal") == "save_recovery_required", "deferred-only storage cannot be reset via gameplay")
+
 func _test_retention() -> void:
     var repo := FailingRepository.new(_directory("retention"))
     for number in range(1, 8):
@@ -255,8 +349,11 @@ func _directory(name: String) -> String:
     return path
 
 func _stage(repo: Repository, generation: int, schema: int, payload: Variant) -> void:
+    _write_snapshot(repo, "pending", generation, schema, payload)
+
+func _write_snapshot(repo: Repository, suffix: String, generation: int, schema: int, payload: Variant) -> void:
     var body := JSON.stringify({"schemaVersion": schema, "generation": generation, "payload": payload})
-    _write(repo, "tp-save-%d.pending" % generation, JSON.stringify({"body": body, "sha256": body.sha256_text()}))
+    _write(repo, "tp-save-%d.%s" % [generation, suffix], JSON.stringify({"body": body, "sha256": body.sha256_text()}))
 
 func _write(repo: Repository, filename: String, contents: String) -> void:
     var file := FileAccess.open(repo._directory.path_join(filename), FileAccess.WRITE)

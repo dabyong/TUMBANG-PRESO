@@ -28,17 +28,17 @@ func load_latest() -> Dictionary:
         return result
     var latest := 0
     var staged := 0
-    var highest_published := 0
+    var stage_cutoff := 0
     var filename := dir.get_next()
     while not filename.is_empty():
         if LEGACY.has(filename):
             result.issues[filename] = "legacy_unverified"
         elif filename.begins_with(PREFIX):
-            var pending := filename.ends_with(".pending")
+            var suffix := filename.get_extension()
             var generation := _generation_from_name(filename)
             result.highestGeneration = maxi(result.highestGeneration, generation)
-            if not pending:
-                highest_published = maxi(highest_published, generation)
+            if suffix == "json" or suffix == "deferred":
+                stage_cutoff = maxi(stage_cutoff, generation)
             if generation == 0 or dir.current_is_dir():
                 result.issues[filename] = "invalid_entry"
             else:
@@ -47,7 +47,9 @@ func load_latest() -> Dictionary:
                     result.issues[filename] = entry.error
                     if entry.error == "unsupported_schema":
                         result.writeBlocked = true
-                elif pending:
+                elif suffix == "deferred":
+                    result.issues[filename] = "deferred_stage"
+                elif suffix == "pending":
                     staged = maxi(staged, generation)
                 else:
                     result.verifiedCommitted.append(generation)
@@ -56,7 +58,9 @@ func load_latest() -> Dictionary:
                         result.snapshot = entry
         filename = dir.get_next()
     dir.list_dir_end()
-    if staged > highest_published:
+    result.verifiedCommitted.sort()
+    result.verifiedCommitted.reverse()
+    if staged > stage_cutoff:
         result.stagedGeneration = staged
     elif staged > 0:
         result.issues[_filename(staged, true)] = "stale_stage"
@@ -71,13 +75,20 @@ func save(payload: Dictionary, expected_generation: int = -1) -> bool:
     return publish(payload, expected_generation) > 0
 
 # Returns the generation verified after publication, or zero on failure.
-func publish(payload: Dictionary, expected_generation: int = -1) -> int:
+func publish(payload: Dictionary, expected_generation: int = -1, validate_payload: Callable = Callable()) -> int:
     var current := load_latest()
     if current.writeBlocked or current.status == Status.RECOVERY_REQUIRED or current.stagedGeneration > 0:
         return 0
     if expected_generation >= 0 and current.snapshot.get("generation", 0) != expected_generation:
         return 0
-    var generation := int(current.highestGeneration) + 1
+    if not current.snapshot.is_empty() and not _valid_payload(current.snapshot, validate_payload):
+        return 0
+    return _publish_next(payload, int(current.highestGeneration), validate_payload)
+
+func _publish_next(payload: Dictionary, highest_generation: int, validate_payload: Callable) -> int:
+    if validate_payload.is_valid() and not validate_payload.call(payload).is_empty():
+        return 0
+    var generation := highest_generation + 1
     if generation > MAX_GENERATION:
         return 0
     var body := JSON.stringify({"schemaVersion": SCHEMA_VERSION, "generation": generation, "payload": payload}, "", true, true)
@@ -91,44 +102,78 @@ func publish(payload: Dictionary, expected_generation: int = -1) -> int:
     file.flush()
     var write_error := file.get_error()
     file.close()
-    return generation if write_error == OK and _commit(generation) else 0
+    return generation if write_error == OK and _commit(generation, validate_payload) else 0
 
-func recover_staged(generation: int) -> bool:
+func recover_staged(generation: int, validate_payload: Callable = Callable()) -> bool:
     var current := load_latest()
-    return not current.writeBlocked and generation > 0 and generation == current.stagedGeneration and _commit(generation)
+    return not current.writeBlocked and generation > 0 and generation == current.stagedGeneration and _commit(generation, validate_payload)
 
-func _commit(generation: int) -> bool:
+func recover_committed(generation: int, expected_latest: int, validate_payload: Callable) -> bool:
+    var current := load_latest()
+    if current.writeBlocked or current.stagedGeneration > 0 or not validate_payload.is_valid():
+        return false
+    if generation <= 0 or generation >= expected_latest or current.snapshot.get("generation", 0) != expected_latest:
+        return false
+    if _valid_payload(current.snapshot, validate_payload):
+        return false
+    var chosen := read_committed(generation)
+    if not _valid_payload(chosen, validate_payload):
+        return false
+    return _publish_next(chosen.payload, int(current.highestGeneration), validate_payload) > 0
+
+func defer_staged(generation: int) -> bool:
+    var current := load_latest()
+    if current.writeBlocked or generation <= 0 or generation != current.stagedGeneration:
+        return false
+    var dir := DirAccess.open(_directory)
+    var deferred := PREFIX + str(generation) + ".deferred"
+    if dir == null or dir.file_exists(deferred) or dir.dir_exists(deferred):
+        return false
+    return dir.rename(_filename(generation, true), deferred) == OK
+
+func _commit(generation: int, validate_payload: Callable) -> bool:
     var staged := _filename(generation, true)
     var committed := _filename(generation, false)
     var dir := DirAccess.open(_directory)
     if dir == null or dir.file_exists(committed) or dir.dir_exists(committed):
         return false
-    if _read_snapshot(staged, generation).has("error") or dir.rename(staged, committed) != OK:
+    if not _valid_payload(_read_snapshot(staged, generation), validate_payload) or dir.rename(staged, committed) != OK:
         return false
-    if _read_snapshot(committed, generation).has("error"):
+    if not _valid_payload(_read_snapshot(committed, generation), validate_payload):
         return false
-    _prune_committed(dir)
+    _prune_committed(dir, validate_payload)
     return true
 
-func _prune_committed(dir: DirAccess) -> void:
+func _prune_committed(dir: DirAccess, validate_payload: Callable) -> void:
     var current := load_latest()
     if current.writeBlocked:
         return
-    var generations: Array = current.verifiedCommitted
-    generations.sort()
-    for index in range(generations.size() - RETAIN_COMMITTED):
-        var generation: int = generations[index]
+    var retained := 0
+    for generation: int in current.verifiedCommitted:
         var filename := _filename(generation, false)
-        if not _read_snapshot(filename, generation).has("error"):
+        if not _valid_payload(_read_snapshot(filename, generation), validate_payload):
+            continue
+        if retained < RETAIN_COMMITTED:
+            retained += 1
+        else:
             _remove_committed(dir, filename)
+
+func _valid_payload(snapshot: Dictionary, validate_payload: Callable) -> bool:
+    var payload: Variant = snapshot.get("payload")
+    return payload is Dictionary and (not validate_payload.is_valid() or validate_payload.call(payload).is_empty())
 
 func _remove_committed(dir: DirAccess, filename: String) -> Error:
     return dir.remove(filename)
 
 func read_staged(generation: int) -> Dictionary:
-    if generation <= 0:
+    if generation <= 0 or generation > MAX_GENERATION:
         return {"error": "invalid_generation"}
     return _read_snapshot(_filename(generation, true), generation)
+
+func read_committed(generation: int) -> Dictionary:
+    if generation <= 0 or generation > MAX_GENERATION:
+        return {"error": "invalid_generation"}
+    return _read_snapshot(_filename(generation, false), generation)
 
 func _read_snapshot(filename: String, generation: int) -> Dictionary:
     var file := FileAccess.open(_directory.path_join(filename), FileAccess.READ)
@@ -150,13 +195,11 @@ func _read_snapshot(filename: String, generation: int) -> Dictionary:
         return {"error": "invalid_snapshot"}
     if snapshot.get("schemaVersion") != SCHEMA_VERSION:
         return {"error": "unsupported_schema"}
-    if not snapshot.get("payload") is Dictionary:
-        return {"error": "invalid_snapshot"}
     return snapshot
 
 func _generation_from_name(filename: String) -> int:
     var suffix := filename.get_extension()
-    if suffix not in ["json", "pending"]:
+    if suffix not in ["json", "pending", "deferred"]:
         return 0
     var digits := filename.get_basename().trim_prefix(PREFIX)
     if not digits.is_valid_int() or digits.length() > 16:

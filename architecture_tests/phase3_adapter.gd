@@ -9,9 +9,9 @@ const Payload = preload("res://scripts/domain/gameplay_payload.gd")
 class InterruptibleRepository extends Repository:
     var interrupt_write := false
 
-    func _commit(generation: int) -> bool:
+    func _commit(generation: int, validate_payload: Callable) -> bool:
         if not interrupt_write:
-            return super._commit(generation)
+            return super._commit(generation, validate_payload)
         interrupt_write = false
         var file := FileAccess.open(_directory.path_join(_filename(generation, true)), FileAccess.WRITE)
         if file != null:
@@ -116,7 +116,7 @@ func _operate(operation: Dictionary) -> String:
         "recordSuccessfulRun":
             var candidate := _store.snapshot()
             Progress.merge_success(candidate.progress, _campaign, operation.provinceId, operation.difficulty, operation.score, operation.stars)
-            if not Payload.validate(candidate, _campaign, {}, "").is_empty() or not _repository.save(candidate):
+            if _repository.publish(candidate, -1, Payload.validate.bind(_campaign, {}, "")) == 0:
                 return "record commit failed"
             _restart()
             return _recovery_error

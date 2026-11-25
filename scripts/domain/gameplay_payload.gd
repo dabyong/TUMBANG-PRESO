@@ -6,7 +6,9 @@ const Progress = preload("res://scripts/domain/campaign_progress.gd")
 const Content = preload("res://scripts/domain/content_validator.gd")
 const VERSION := 1
 
-static func validate(payload: Dictionary, campaign: Dictionary, questions: Dictionary, version: String) -> String:
+static func validate(payload: Variant, campaign: Dictionary, questions: Dictionary, version: String) -> String:
+    if not payload is Dictionary:
+        return "invalid_gameplay_payload"
     if not Progress.is_integer(payload.get("gameplayVersion"), VERSION, VERSION) or not payload.has("session"):
         return "unsupported_gameplay_payload"
     var progress: Variant = payload.get("progress")

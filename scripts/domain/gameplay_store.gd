@@ -28,39 +28,100 @@ func _init(repository: Repository, campaign: Dictionary, catalog: Dictionary) ->
 
 func restore() -> Dictionary:
     var loaded := _repository.load_latest()
+    var latest := int(loaded.snapshot.get("generation", 0))
+    var report := {
+        "status": loaded.status, "issues": loaded.issues, "stagedGeneration": loaded.stagedGeneration,
+        "stagedError": "", "committedGeneration": latest, "snapshotGeneration": 0,
+        "payloadIssues": {}, "recoveryCandidates": [],
+    }
     _payload = {}
     _generation = 0
     _error = ""
+    if _content_valid and latest > 0:
+        _load_committed(loaded, report)
+    if _content_valid and loaded.stagedGeneration > 0:
+        report.stagedError = _snapshot_error(_repository.read_staged(loaded.stagedGeneration))
     if not _content_valid:
         _error = "invalid_content"
     elif loaded.status == Repository.Status.UNREADABLE:
         _error = "unreadable_save"
     elif loaded.writeBlocked:
         _error = "unsupported_save_schema"
+    elif loaded.stagedGeneration > 0:
+        _error = "pending_recovery"
     elif loaded.status == Repository.Status.FIRST_LAUNCH:
         _payload = {"gameplayVersion": Payload.VERSION, "session": null, "usedSessionIds": [], "progress": Progress.initial(_campaign)}
-    elif loaded.snapshot.is_empty():
+    elif latest == 0:
         _error = "save_recovery_required"
-    else:
-        _error = Payload.validate(loaded.snapshot.payload, _campaign, _questions, _version)
-        if _error.is_empty():
-            _generation = int(loaded.snapshot.generation)
-            _payload = loaded.snapshot.payload
-            Payload.normalize_validated(_payload)
-    return {"error": _error, "stagedGeneration": loaded.stagedGeneration, "status": loaded.status, "issues": loaded.issues}
+    elif report.payloadIssues.has(latest):
+        _error = report.payloadIssues[latest]
+    report.error = _error
+    report.snapshotGeneration = _generation
+    if not _error.is_empty() and loaded.status != Repository.Status.UNREADABLE:
+        report.status = Repository.Status.RECOVERY_REQUIRED
+    return report
+
+func _load_committed(loaded: Dictionary, report: Dictionary) -> void:
+    var error := _snapshot_error(loaded.snapshot)
+    if error.is_empty():
+        _use_snapshot(loaded.snapshot)
+        return
+    report.payloadIssues[report.committedGeneration] = error
+    for generation: int in loaded.verifiedCommitted:
+        if generation == report.committedGeneration:
+            continue
+        var candidate := _repository.read_committed(generation)
+        error = _snapshot_error(candidate)
+        if not error.is_empty():
+            report.payloadIssues[generation] = error
+            continue
+        report.recoveryCandidates.append(generation)
+        if _payload.is_empty():
+            _use_snapshot(candidate)
+
+func _use_snapshot(entry: Dictionary) -> void:
+    _generation = int(entry.generation)
+    _payload = entry.payload
+    Payload.normalize_validated(_payload)
+
+func _validate_payload(payload: Variant) -> String:
+    return Payload.validate(payload, _campaign, _questions, _version)
+
+func _snapshot_error(entry: Dictionary) -> String:
+    return entry.error if entry.has("error") else _validate_payload(entry.get("payload"))
 
 func recover_staged(generation: int) -> String:
-    if not _content_valid:
-        return "invalid_content"
-    if generation <= 0 or _repository.load_latest().stagedGeneration != generation:
+    var loaded := restore()
+    if loaded.error != "pending_recovery":
+        return loaded.error if not loaded.error.is_empty() else "ineligible_stage"
+    if generation != loaded.stagedGeneration:
         return "ineligible_stage"
-    var staged := _repository.read_staged(generation)
-    if staged.has("error"):
-        return staged.error
-    var error := Payload.validate(staged.payload, _campaign, _questions, _version)
-    if not error.is_empty():
-        return error
-    if not _repository.recover_staged(generation):
+    if not loaded.stagedError.is_empty():
+        return loaded.stagedError
+    if not _repository.recover_staged(generation, _validate_payload):
+        return "commit_failed"
+    return restore().error
+
+func defer_staged(generation: int) -> String:
+    var loaded := restore()
+    if loaded.error != "pending_recovery":
+        return loaded.error if not loaded.error.is_empty() else "ineligible_stage"
+    if generation != loaded.stagedGeneration:
+        return "ineligible_stage"
+    if not _repository.defer_staged(generation):
+        return "commit_failed"
+    restore()
+    return ""
+
+func recover_committed(generation: int, expected_latest: int) -> String:
+    var loaded := restore()
+    if loaded.error in ["unsupported_save_schema", "pending_recovery", "unreadable_save", "invalid_content"]:
+        return loaded.error
+    if loaded.committedGeneration != expected_latest:
+        return "stale_recovery_decision"
+    if generation not in loaded.recoveryCandidates:
+        return "ineligible_committed"
+    if not _repository.recover_committed(generation, expected_latest, _validate_payload):
         return "commit_failed"
     return restore().error
 
@@ -118,10 +179,10 @@ func acknowledge_feedback(session_id: Variant, command_id: Variant) -> String:
     return _commit(candidate)
 
 func _commit(candidate: Dictionary) -> String:
-    var error := Payload.validate(candidate, _campaign, _questions, _version)
+    var error := _validate_payload(candidate)
     if not error.is_empty():
         return error
-    var generation := _repository.publish(candidate, _generation)
+    var generation := _repository.publish(candidate, _generation, _validate_payload)
     if generation == 0:
         return "commit_failed"
     _generation = generation

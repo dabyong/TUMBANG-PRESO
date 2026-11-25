@@ -26,7 +26,7 @@ From the repository root:
     python3 architecture_tests/phase3_acceptance.py --adapter python3 architecture_tests/phase3_adapter.py
     python3 architecture_tests/phase3_acceptance.py --domain-adapter python3 architecture_tests/phase3_adapter.py
 
-Use Python 3 and put Godot on the path or set `GODOT` to the headless executable. CI also confirms that an intentional failed check exits with status 1 and verifies the clean mobile staging project. The gameplay contract documents two open conflicts in the Phase 3 fixture that currently cause its strict gameplay command to exit 1.
+Use Python 3 and put Godot on the path or set `GODOT` to the headless executable. CI also confirms that an intentional failed check exits with status 1 and verifies the clean mobile staging project. The gameplay contract documents the Phase 3 failure fixture correction and the explicit save recovery decisions.
 
 - [Local persistence contract](docs/save-foundation.md)
 - [Gameplay session and Phase 3 adapter](docs/gameplay-domain.md)

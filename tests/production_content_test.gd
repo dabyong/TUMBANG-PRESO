@@ -34,6 +34,7 @@ func _run() -> void:
     var incomplete := campaign.duplicate(true)
     incomplete.provinces[0].questionPools.hard.clear()
     _check(not Content.validate_production(catalog, incomplete).is_empty(), "production rejects missing hard content")
+    _test_malformed_campaign(campaign, catalog)
     var folder := "user://production-content-%d-%d" % [OS.get_process_id(), Time.get_ticks_usec()]
     if DirAccess.make_dir_absolute(folder) == OK:
         _test_sessions(campaign, catalog, indexed, Repository.new(folder))
@@ -45,6 +46,27 @@ func _run() -> void:
         _check(false, "isolated save directory")
     print("Production content checks: %d passed, %d failed" % _counts)
     quit(0 if _counts[1] == 0 else 1)
+
+func _test_malformed_campaign(campaign: Dictionary, catalog: Dictionary) -> void:
+    var cases := [
+        ["province must be an object", func(c): c.provinces[1] = null],
+        ["invalid or duplicate provinceId", func(c): c.provinces[1].erase("provinceId")],
+        ["invalid or duplicate provinceId", func(c): c.provinces[1].provinceId = 7],
+        ["must define easy, normal and hard pools", func(c): c.provinces[0].erase("questionPools")],
+        ["must define easy, normal and hard pools", func(c): c.provinces[0].questionPools = []],
+        ["must define easy, normal and hard pools", func(c): c.provinces[0].questionPools.erase("hard")],
+        ["hard pool must be an array", func(c): c.provinces[0].questionPools = {"easy": [], "normal": [], "expert": []}],
+        ["hard pool must be an array", func(c): c.provinces[0].questionPools.hard = false],
+        ["startProvinceId is invalid", func(c): c.erase("startProvinceId")],
+        ["startProvinceId is invalid", func(c): c.startProvinceId = "missing"],
+        ["references an unknown chapter", func(c): c.provinces[0].chapterId = "missing"],
+        ["references an unknown endpoint", func(c): c.routes[0].toProvinceId = "missing"],
+    ]
+    for item in cases:
+        var invalid := campaign.duplicate(true)
+        item[1].call(invalid)
+        var errors := Content.validate_production(catalog, invalid)
+        _check("\n".join(errors).contains(item[0]), "production rejects malformed campaign: " + item[0])
 
 func _test_sessions(campaign: Dictionary, catalog: Dictionary, indexed: Dictionary, repo: Repository) -> void:
     var prior_campaign := _read("res://tests/fixtures/foundation_campaign.json")

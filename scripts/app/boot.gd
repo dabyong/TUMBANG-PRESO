@@ -1,6 +1,5 @@
 extends Control
 
-const CampaignGraph = preload("res://scripts/domain/campaign_graph.gd")
 const ContentValidator = preload("res://scripts/domain/content_validator.gd")
 const SaveRepository = preload("res://scripts/domain/save_repository.gd")
 const Session = preload("res://scripts/domain/gameplay_session.gd")
@@ -17,9 +16,8 @@ var _gameplay
 func _ready() -> void:
     var campaign := _read_json("res://content/campaign/campaign.json")
     var catalog := _read_json("res://content/questions/catalog.json")
-    var campaign_errors := CampaignGraph.validate(campaign)
-    var question_errors := ContentValidator.validate_production(catalog, campaign)
-    if campaign_errors.is_empty() and question_errors.is_empty():
+    var content_errors := ContentValidator.validate_production(catalog, campaign)
+    if content_errors.is_empty():
         _gameplay = Gameplay.instantiate()
         _gameplay.hide()
         add_child(_gameplay)
@@ -35,7 +33,7 @@ func _ready() -> void:
     else:
         _app_state.set_offline_ready(false)
         status_label.text = "Content validation error"
-        push_error("Campaign: %s | Questions: %s" % [campaign_errors, question_errors])
+        push_warning("Content validation error: %s" % [content_errors])
 
 func _open_gameplay() -> void:
     $Content.hide()

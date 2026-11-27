@@ -1,6 +1,7 @@
 extends SceneTree
 
 const Boot = preload("res://scenes/boot.tscn")
+const BootScript = preload("res://scripts/app/boot.gd")
 const Gameplay = preload("res://scenes/gameplay/gameplay.tscn")
 const Repository = preload("res://scripts/domain/save_repository.gd")
 const Store = preload("res://scripts/domain/gameplay_store.gd")
@@ -10,6 +11,13 @@ const HUD := "Margin/Frame/HUD/"
 const ANSWERS := PANELS + "Play/Answers"
 const FEEDBACK := PANELS + "Play/Feedback/"
 const HINT := PANELS + "Play/Hint"
+
+class InvalidCampaignBoot extends BootScript:
+    func _read_json(path: String) -> Dictionary:
+        var data := super._read_json(path)
+        if path == "res://content/campaign/campaign.json":
+            data.provinces[1] = null
+        return data
 
 class ControlledRepository extends Repository:
     var block_write := false
@@ -45,6 +53,7 @@ func _run() -> void:
     await _test_journey(viewport)
     await _test_write_failure(viewport)
     _test_recovery(viewport)
+    _test_invalid_content(viewport)
     viewport.free()
     for path in _paths:
         var directory := DirAccess.open(path)
@@ -242,6 +251,29 @@ func _test_recovery(viewport: SubViewport) -> void:
         _press(game, PANELS + "Diagnostic/Retry")
         _check(not game.get_node(PANELS + "Play").visible and repo.load_latest().highestGeneration == reported.highestGeneration, "diagnostic recheck blocks gameplay and preserves files")
         boot.free()
+
+func _test_invalid_content(viewport: SubViewport) -> void:
+    var folder := _folder("invalid-content")
+    var store := Store.new(Repository.new(folder), _campaign, _catalog)
+    store.restore()
+    _check(store.start_session("existing", "batanes", "easy") == "", "content error fixture has a committed save")
+    _write_stage(folder, Repository.SCHEMA_VERSION, store.snapshot())
+    var files := DirAccess.get_files_at(folder)
+    var contents := {}
+    for filename in files:
+        contents[filename] = FileAccess.get_file_as_bytes(folder.path_join(filename))
+
+    var boot := Boot.instantiate()
+    boot.set_script(InvalidCampaignBoot)
+    boot.save_directory = folder
+    viewport.add_child(boot)
+    _check(boot.get_node("Content/Status").text == "Content validation error", "malformed campaign shows the boot content error")
+    _check(boot.get_node("Content/Play").disabled and not boot.has_node("Gameplay") and not root.get_node("AppState").offline_ready, "content error blocks gameplay before save recovery")
+    var intact := files.size() == 2 and DirAccess.get_files_at(folder) == files
+    for filename in files:
+        intact = intact and FileAccess.get_file_as_bytes(folder.path_join(filename)) == contents[filename]
+    _check(intact, "content error preserves committed and staged save bytes")
+    boot.free()
 
 func _assert_mapping(game: Control, session: Dictionary) -> void:
     var question := _question(session)

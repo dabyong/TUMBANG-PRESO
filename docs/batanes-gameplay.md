@@ -17,3 +17,9 @@ The landscape layout was exercised at 960×540 and 640×360. Question and answer
 The former bundled `foundation-1` catalog and campaign version 1 had empty pools. They could not start a production session. M2.2 keeps the same save envelope and payload schema. Compatible progression-only payloads restore directly and retain their records. Empty save directories initialize through the existing first-launch path. No migration is needed for this transition.
 
 An existing session still requires the exact campaign and catalog fingerprint. A session from different content, unsupported save schema, semantic corruption, or a pending recovery decision opens a diagnostic screen with the available generation details. **Check save again** runs the same read-only restore after the underlying issue has been addressed. The screen does not choose a candidate, promote a stage, or reset a save. Production recovery controls remain deferred. [Storage and recovery contract](save-foundation.md)
+
+## M2.3 integration requirements
+
+- Add a presentation gate between a committed answer and visible feedback or results. Block answer input and feedback acknowledgement while an animation is active. For terminal failure, complete the failure animation before displaying the result screen.
+- Let production navigation select any eligible province and pass that selection to the gameplay controller. Keep one serialized `GameplayStore` for the save directory across navigation and gameplay.
+- Add production recovery controls that use the existing explicit recovery decisions.

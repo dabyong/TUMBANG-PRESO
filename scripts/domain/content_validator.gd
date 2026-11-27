@@ -1,11 +1,15 @@
 class_name ContentValidator
 extends RefCounted
 
-const DIFFICULTIES := ["easy", "normal", "hard"]
+const Graph = preload("res://scripts/domain/campaign_graph.gd")
+const DIFFICULTIES := Graph.DIFFICULTIES
 const MIN_POOL_SIZE := 5
 
 static func validate_production(catalog: Dictionary, campaign: Dictionary) -> PackedStringArray:
-    var errors := validate_catalog(catalog, campaign)
+    var errors := Graph.validate(campaign)
+    if not errors.is_empty():
+        return errors
+    errors = validate_catalog(catalog, campaign)
     if not errors.is_empty():
         return errors
     if catalog.mode != "playable" or not valid_id(catalog.get("contentVersion")):
@@ -127,4 +131,4 @@ static func _non_blank(value: Variant) -> bool:
     return value is String and not value.strip_edges().is_empty()
 
 static func valid_id(value: Variant) -> bool:
-    return _non_blank(value) and value == value.strip_edges() and not value.contains("\n") and not value.contains("\r")
+    return Graph.valid_id(value)

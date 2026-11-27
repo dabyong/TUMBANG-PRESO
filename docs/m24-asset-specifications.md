@@ -1,0 +1,54 @@
+# M2.4A production asset specifications
+
+These dimensions are proposals for the existing 960×540 landscape reference canvas. The scenes use 30 px horizontal and 16 px vertical gameplay margins plus device insets. The answer rows have a 54 px minimum height, a 7 px gap, and a 55 px text inset. Labels wrap, and rows grow to fit. The can control is 62×58, with a roughly 32×38 idle silhouette. The effects overlay reserves 16×26 for the visible projectile. These values are logical pixels. [Approved gameplay and navigation](ui-navigation-animations.md)
+
+## Visual inventory to produce
+
+All filenames below are relative to `assets/production/`. PNG is the proposed release source for raster art. Use lossless imports, nearest sampling for pixel art, and no mipmaps for these 2D surfaces. Use integer scale in the reference canvas wherever possible. At fractional or very small device scales, check silhouettes for shimmer and aliasing and check labels independently at the actual text scale. Keep sprite edge pixels transparent and atlas cells isolated. Test alpha edges on light and dark backing. [Godot image import documentation](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_images.html)
+
+| Asset ID and filename | Scene and display size | Source and aspect | Alpha, anchor, safe area, and style |
+| --- | --- | --- | --- |
+| `brand-logo` · `branding/logo.png` | Boot and main menu, up to 416×88 | 208×44, 52:11, one image | Transparent, centered in the menu or boot content box. Trim internal padding, leave space for live subtitle and status, and scale down within safe margins. Use a bold pixel wordmark with clean letter gaps. |
+| `menu-bg` · `environments/menu.png` | Main menu, 960×540 at reference | 480×270, 16:9, one image | Opaque, center cover. Extend scenery to screen edges, keep identifying features in the center, and reserve a calm area behind the controls. |
+| `batanes-play-bg` · `environments/batanes/gameplay.png` | Gameplay, 960×540 at reference | 480×270, 16:9, one image | Opaque, center cover. Keep foreground contrast low behind HUD and answer panel. Give the stage visible ground without blending into the can or flight path. |
+| `batanes-discovery` · `environments/batanes/discovery.png` | Discovery strip, 896×96 reference, fills responsive width and respects 76 px minimum height | 448×48, 28:3, one image | Opaque, center cover. Keep the hill, coast, or stone house focal point within the center half. Preserve space for separately rendered discovery text. |
+| `northern-luzon-map` · `map/northern-luzon.png` | Map chart, 138×188 minimum, grows with available layout | 72×104, 9:13, one image | Opaque, centered crop. Use a subdued schematic coastline and sea pattern. Keep route lines, province markers, labels, and focus state live, with land/sea connections supplied by campaign data. |
+| `tsinelas-01` through `tsinelas-05` · `sprites/tsinelas.png` | Five answer rows and the effects overlay, 32×32 answer frame with roughly 26 px long visible silhouette, 16×26 visible in flight | 80×16 atlas, 5× 16×16 cells, square cells | Transparent. Pivot at (8,8) in each cell. Place displayed center at (23, row height ÷ 2). Preserve silhouette proportions in flight and allow rotation padding. Order the cells ivory/pink, navy/tan, green/yellow, brown/banded, orange/pink. Distinguish straps or tread in grayscale. Match the selected row during flight and keep correctness independent of pigment or pattern. |
+| `can-idle` · `sprites/can-idle.png` | Gameplay, 48×48 frame inside the 62×58 target, approximately 32×38 of painted pixels | 48×48, 1:1, one image | Transparent, pivot (24,24) placed at the control center. Show an open rim and a simple metal highlight. Keep opaque pixels within a rotation-safe radius of the pivot. |
+| `can-knocked` · `sprites/can-knocked.png` | Gameplay, same frame as idle after impact | 48×48, 1:1, one image | Transparent, shared pivot (24,24) and compatible ground contact. Test the silhouette through the existing two rotations and tip motion and at reduced-motion settings. Existing transforms can animate both poses. |
+| `star-filled`, `star-empty` · `ui/stars.png` | Results, 24×24 each in the current roughly 36 px star row | 48×24 atlas with two square cells | Transparent, center (12,12) per cell. Differentiate solid and outlined shapes and preserve live result information. |
+| `impact-correct` · `sprites/impact-correct.png` | Gameplay correct impact, up to 48×48 | 288×48 strip, six 48×48 cells | Transparent, center on the can pivot. Use sparks with visible expansion and fade. Fit the M2.3 correct window of 0.48 s, with a short static or reduced sequence in the 0.10 s reduced window. |
+| `impact-miss` · `sprites/impact-miss.png` | Gameplay miss impact, up to 32×32 | 128×32 strip, four 32×32 cells | Transparent, center on the clamped miss point. Use a small dust puff with limited contrast. Fit the 0.20 s normal and 0.10 s reduced windows. Keep the failure overlay and its readable message procedural. |
+| `impact-reward` · `sprites/impact-reward.png` | Optional results accent, up to 32×32 per active star | 192×32 strip, six 32×32 cells | Transparent, center over the current star. Keep the result readable through all frames. Fit the existing victory window of 0.60 s or reduce to a still accent for the 0.15 s window. |
+| `ui-panel` · optional `ui/panel.png` | Menu, gameplay, discovery, map, settings, and results at container size | 32×24, 4:3, optional nine-slice | Transparent outer corners and an opaque or near-opaque center. Anchor to each rect. Propose 14 px horizontal and 8 px vertical patches with a 2 px edge. Scale center and edges without stretching corners. Reuse Godot theme styles where raster art adds little. |
+| `ui-button-states` · optional `ui/button-states.png` | Navigation and gameplay buttons at layout width, general minimum height 48–50 px, answer minimum 54 px | 192×24 strip with six 32×24 nine-slice cells | Transparent outer corners and anchored to control bounds. Provide normal, hover, focus, pressed, disabled, and selected states. Preserve a visible focus ring beside selected or disabled cues. Use live labels and retain margins for wrapping. Keep correctness feedback separate from baseline button states. |
+| `nav-icons` · `ui/navigation.png` | Menu, map, settings, pause and results, 16–24 px within existing 48–50 px chrome | 96×16 atlas, six 16×16 cells | Transparent, center (8,8) per cell. Propose play, map, back, settings, pause, and sound in that order. Pair with text or existing accessible control names. At fractional scale check the simple silhouettes visually. |
+| `ui-type` · engine theme, optional `fonts/ui-text.ttf` | Live text across the app. Current reference sizes include 52 px main title, 26 px question, 20 px answers/feedback, 19 px score, and around 16–17 px context/hints. | Scalable outlines with no raster source size or fixed aspect | Glyphs rendered with normal font antialiasing, baseline and wrapping from Godot controls. Verify punctuation, Filipino copy, long labels and focus spacing. Keep current theme type for the first pass. If a separately licensed typeface is approved, stage its exact file and required notices and test font coverage before adopting it. |
+
+Use the existing throw origin and target transforms. The overlay launches from the visible portion of the selected button and clamps trajectories within the viewport. Test fidelity through the normal 0.44 s and reduced 0.12 s throw phases. Stage art can use the same can source as the HUD fallback. Keep the rendered gameplay silhouette consistent with the effects pivot when the stage moves. [Art direction and wireframes](m24-art-direction.md)
+
+## Storage estimates
+
+The complete set above fits approximately 1.28 MiB of unpadded RGBA8 texture pixels at the proposed source resolutions, excluding font glyph caches and engine padding. This is computed from source pixel areas × 4 bytes. Two 480×270 backgrounds account for about 0.99 MiB of that estimate. Doubling both source widths and heights would add about 2.97 MiB of uncompressed texture pixels. Allocate up to 2 MiB for release PNGs and up to 250 KiB for an optional font. PNG sizes and runtime allocations will depend on final media and Godot import behavior. Reserve about 3.5 MiB for nominal audio, for a combined first-pass budget of about 5.8 MiB including the optional font and excluding engine or container overhead. Measure staged bytes, packaged delta, and actual device texture use when media are approved. [Audio storage calculation](m24-audio-plan.md)
+
+## Production directories and release review
+
+```text
+assets/production/
+  branding/
+  environments/
+    batanes/
+  map/
+  sprites/
+  ui/
+  fonts/
+  audio/
+    music/
+    sfx/
+```
+
+Retain editable masters, reference sheets, and rights evidence in the approved source archive outside the staged set. Continue the current manifest convention for historical media. Once the owner approves a production inventory, introduce a versioned production manifest or a versioned production section in the current manifest. Record for each file the asset ID, exact normalized repository-relative path, category, creation method, creator or source, tool/provider and applicable version, license or usage terms and evidence reference, attribution text and placement, commercial-use review status, dated project-owner approval, source SHA-256, and release status. For attribution files track and verify their own paths and checksums if they must ship.
+
+Use the approved inventory as an exact-path allowlist for a future clean staging run. Require commercial review and owner approval before a file can have release status `approved`. Treat missing approvals, missing files, unsupported formats, ID or case-insensitive path collisions, and any mismatch as release errors. Validate forward-slash paths inside `assets/production/`. Reject absolute and drive-relative paths, UNC paths, backslashes, colons, empty segments, and dot or dot-dot segments. Require regular files and reject symlinks, junctions, and other reparse-point aliases throughout source and destination paths. Verify resolved containment before reading and copying. Check each declared SHA-256 before staging and verify it again in the clean output. Compare the staged media inventory to the exact approved set. Keep the legacy MP3 explicitly denied by path and known digest.
+
+Add negative tests with valid and invalid manifests covering traversal, symlink and junction escape, unlisted files, invalid checksums, duplicate or case-colliding paths, unsupported formats, missing rights evidence, and restricted audio. The current mobile staging rules already exclude production and prototype media directories and legacy root art/audio. The allowlist here is a design for a later approved inventory. [Mobile export rules](mobile-export.md) · [Current manifest](asset-manifest.json)

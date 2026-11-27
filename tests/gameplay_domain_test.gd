@@ -31,7 +31,7 @@ func _run() -> void:
         push_error("Cannot create test directory")
         quit(1)
         return
-    _campaign = JSON.parse_string(FileAccess.get_file_as_string("res://content/campaign/campaign.json"))
+    _campaign = JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/foundation_campaign.json"))
     _test_graph()
     _make_catalog()
     _test_session()

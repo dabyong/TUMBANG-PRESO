@@ -1,0 +1,35 @@
+[gd_scene format=3]
+
+
+[node name="Result" type="VBoxContainer"]
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 34
+autowrap_mode = 3
+text = "Results"
+
+[node name="Summary" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+autowrap_mode = 3
+text = ""
+
+[node name="Progress" type="Label" parent="."]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+autowrap_mode = 3
+text = ""
+
+[node name="Replay" type="Button" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 50)
+theme_override_font_sizes/font_size = 19
+text = "Replay"
+
+[node name="Return" type="Button" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 50)
+theme_override_font_sizes/font_size = 19
+text = "Return to province"

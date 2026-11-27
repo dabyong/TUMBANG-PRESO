@@ -34,6 +34,18 @@ jobs:
           godot --headless --path . --script res://tests/gameplay_domain_test.gd 2>&1 | tee gameplay.log
           grep -Eq '^Gameplay checks: [1-9][0-9]* passed, 0 failed$' gameplay.log
           if grep -Eq 'SCRIPT ERROR|^ERROR:' gameplay.log; then exit 1; fi
+      - name: Validate production Batanes content
+        shell: bash
+        run: |
+          godot --headless --path . --script res://tests/production_content_test.gd 2>&1 | tee production.log
+          grep -Eq '^Production content checks: [1-9][0-9]* passed, 0 failed$' production.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' production.log; then exit 1; fi
+      - name: Run gameplay scene integration tests
+        shell: bash
+        run: |
+          godot --headless --path . --script res://tests/gameplay_integration_test.gd 2>&1 | tee integration.log
+          grep -Eq '^Gameplay integration checks: [1-9][0-9]* passed, 0 failed$' integration.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' integration.log; then exit 1; fi
       - name: Run Phase 3 record merge acceptance
         run: python3 architecture_tests/phase3_acceptance.py --domain-adapter python3 architecture_tests/phase3_adapter.py
       - name: Verify failed assertions fail the job

@@ -44,7 +44,7 @@ func _run() -> void:
         return
     _directory = args[0].get_base_dir()
     _repository = InterruptibleRepository.new(_directory)
-    _campaign = JSON.parse_string(FileAccess.get_file_as_string("res://content/campaign/campaign.json"))
+    _campaign = JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/foundation_campaign.json"))
     _load_fixture_content(request.operations)
     _restart()
     if not _recovery_error.is_empty():

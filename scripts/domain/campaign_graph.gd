@@ -1,7 +1,7 @@
 class_name CampaignGraph
 extends RefCounted
 
-const ContentValidator = preload("res://scripts/domain/content_validator.gd")
+const DIFFICULTIES := ["easy", "normal", "hard"]
 const TRAVEL_MODES := ["land", "sea"]
 
 static func validate(campaign: Dictionary) -> PackedStringArray:
@@ -45,10 +45,10 @@ static func validate(campaign: Dictionary) -> PackedStringArray:
         if not _identifier(province.get("chapterId")) or not chapter_ids.has(province.chapterId):
             errors.append("%s references an unknown chapter" % id)
         var pools: Variant = province.get("questionPools")
-        if not pools is Dictionary or pools.size() != ContentValidator.DIFFICULTIES.size():
+        if not pools is Dictionary or pools.size() != DIFFICULTIES.size():
             errors.append("%s must define easy, normal and hard pools" % id)
         else:
-            for difficulty in ContentValidator.DIFFICULTIES:
+            for difficulty in DIFFICULTIES:
                 var pool: Variant = pools.get(difficulty)
                 if not pool is Array:
                     errors.append("%s/%s pool must be an array" % [id, difficulty])
@@ -123,7 +123,10 @@ static func _non_blank(value: Variant) -> bool:
     return value is String and not value.strip_edges().is_empty()
 
 static func _identifier(value: Variant) -> bool:
-    return ContentValidator.valid_id(value) and not value.contains("/")
+    return valid_id(value) and not value.contains("/")
+
+static func valid_id(value: Variant) -> bool:
+    return _non_blank(value) and value == value.strip_edges() and not value.contains("\n") and not value.contains("\r")
 
 static func _positive_integer(value: Variant) -> bool:
     return (value is int or value is float) and value >= 1 and value <= 9007199254740991 and value == floor(value)

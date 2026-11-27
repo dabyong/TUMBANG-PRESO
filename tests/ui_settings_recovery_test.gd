@@ -10,6 +10,7 @@ func run_checks() -> void:
     await _test_staged()
     _test_committed()
     _test_unsupported()
+    _test_preference_recovery()
 
 func _test_settings() -> void:
     var repo := repository("preferences")
@@ -41,7 +42,7 @@ func _test_settings() -> void:
     press(game, ACK)
     tap(game, question(game).correctOptionId)
     step(game, 0.15)
-    var can := game.get_node(PANELS + "Play/PromptRow/TinCan")
+    var can := game.get_node(HUD + "TinCan")
     check(game.presentation_state() == "impact" and game.get_node("Effects").reduced and can.spin_radians == 0.0, "reduced motion removes the 720-degree spin")
     step(game, 1.0)
     press(game, ACK)
@@ -125,3 +126,61 @@ func _seed(repo: Repository) -> Dictionary:
     store.restore()
     check(store.start_session("existing", "batanes", "easy") == "", "fixture contains a committed session")
     return store.snapshot()
+
+func _test_preference_recovery() -> void:
+    var game_repo := repository("preferences-interrupted")
+    _seed(game_repo)
+    var game_path := game_repo._directory.path_join("tp-save-1.json")
+    var game_bytes := FileAccess.get_file_as_bytes(game_path)
+    var path := game_repo._directory.path_join("preferences")
+    check(DirAccess.make_dir_absolute(path) == OK, "isolated preferences directory exists")
+    var prefs_repo := Repository.new(path)
+    var candidate := Preferences.DEFAULTS.duplicate()
+    candidate.music = 0.25
+    write_generation(prefs_repo, 1, "pending", candidate)
+    var prefs := Preferences.new(game_repo._directory)
+    check(prefs.values.music == 0.25 and prefs_repo.load_latest().snapshot.generation == 1, "compatible first interrupted preferences are promoted on restart")
+    candidate.effects = 0.35
+    write_generation(prefs_repo, 2, "pending", candidate)
+    prefs = Preferences.new(game_repo._directory)
+    check(prefs.values.effects == 0.35 and prefs_repo.load_latest().stagedGeneration == 0, "newest compatible staged settings are applied exactly once")
+    write_generation(prefs_repo, 3, "pending", {"version": 1, "music": "invalid"})
+    var malformed := FileAccess.get_file_as_bytes(path.path_join("tp-save-3.pending"))
+    prefs = Preferences.new(game_repo._directory)
+    check(prefs.values.music == 0.25 and prefs.values.effects == 0.35, "malformed stage keeps the valid committed settings")
+    check(FileAccess.get_file_as_bytes(path.path_join("tp-save-3.deferred")) == malformed, "malformed staged envelope is preserved byte for byte")
+    check(prefs.update("reduced_motion", true) and prefs_repo.load_latest().snapshot.generation == 4, "an edit safely publishes beyond the deferred generation")
+    check(Preferences.new(game_repo._directory).values.reduced_motion, "subsequent edits survive a restart")
+    var future := candidate.duplicate()
+    future.version = Preferences.VERSION + 1
+    write_generation(prefs_repo, 5, "pending", future)
+    var future_bytes := FileAccess.get_file_as_bytes(path.path_join("tp-save-5.pending"))
+    prefs = Preferences.new(game_repo._directory)
+    check(prefs.values.reduced_motion and FileAccess.get_file_as_bytes(path.path_join("tp-save-5.deferred")) == future_bytes, "unsupported staged payload version is preserved without being applied")
+    check(prefs.update("effects", 0.6) and prefs_repo.load_latest().snapshot.generation == 6, "an archived future payload does not block safe supported writes")
+    write_generation(prefs_repo, 7, "json", future)
+    prefs = Preferences.new(game_repo._directory)
+    check(prefs.storage_error == "unsupported preferences version" and prefs.values.effects == 0.6 and not prefs.update("music", 0.4) and prefs_repo.load_latest().snapshot.generation == 7, "unsupported committed payload version keeps compatible display values and blocks edits")
+    write_generation(prefs_repo, 8, "pending", candidate, Repository.SCHEMA_VERSION + 1)
+    prefs = Preferences.new(game_repo._directory)
+    check(prefs.storage_error == "unsupported preference save schema" and not prefs.update("music", 0.8) and FileAccess.file_exists(path.path_join("tp-save-8.pending")), "unknown envelope schema blocks edits and remains intact even for a no-op request")
+    check(FileAccess.get_file_as_bytes(game_path) == game_bytes and game_repo.load_latest().highestGeneration == 1, "preference recovery preserves all gameplay bytes and generations")
+
+    var fresh_repo := repository("preferences-partial")
+    path = fresh_repo._directory.path_join("preferences")
+    check(DirAccess.make_dir_absolute(path) == OK, "isolated first-write directory exists")
+    var partial := FileAccess.open(path.path_join("tp-save-1.pending"), FileAccess.WRITE)
+    partial.store_string("unfinished bytes")
+    partial.close()
+    prefs = Preferences.new(fresh_repo._directory)
+    check(prefs.values == Preferences.DEFAULTS and prefs.update("music", 0.5), "first incomplete publication allows an explicit fresh preferences edit")
+    var archived := false
+    for directory in DirAccess.get_directories_at(fresh_repo._directory):
+        if directory.begins_with("preferences-preserved-"):
+            archived = FileAccess.get_file_as_string(fresh_repo._directory.path_join(directory).path_join("tp-save-1.pending")) == "unfinished bytes"
+    check(archived and Preferences.new(fresh_repo._directory).values.music == 0.5, "first-write damage is preserved in its archived directory")
+    var exhausted := Repository.new(path)
+    var last := prefs.values.duplicate()
+    write_generation(exhausted, Repository.MAX_GENERATION, "json", last)
+    var updated := prefs.update("music", 0.9)
+    check(not updated and prefs.storage_error == "could not publish preferences" and prefs.values.music == 0.5, "failed publication leaves the proposed values unapplied (%s, %s, %s)" % [updated, prefs.storage_error, prefs.values.music])

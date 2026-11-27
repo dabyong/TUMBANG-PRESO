@@ -15,6 +15,33 @@ var manual := false
 var source: Control
 var target: Control
 var correct := false
+var _launch_fraction := Vector2.ZERO
+
+func capture_launch(clip: Control) -> void:
+    var inverse := get_global_transform_with_canvas().affine_inverse()
+    var clip_transform := inverse * clip.get_global_transform_with_canvas()
+    var visible := Rect2(clip_transform.origin, clip_transform * clip.size - clip_transform.origin)
+    var launch: Vector2 = inverse * source.throw_origin()
+    _launch_fraction = launch.clamp(visible.position, visible.end) / size.max(Vector2.ONE)
+
+func trajectory() -> PackedVector2Array:
+    var padding := Vector2(18, 18)
+    var lower_right := (size - padding).max(padding)
+    var from := (_launch_fraction * size).clamp(padding, lower_right)
+    var inverse := get_global_transform_with_canvas().affine_inverse()
+    var to := inverse * (target.get_global_transform_with_canvas() * (target.size * 0.5))
+    if not correct:
+        to += Vector2(72, 32)
+    return PackedVector2Array([from, to.clamp(padding, lower_right)])
+
+func projectile_position(ratio: float) -> Vector2:
+    var path := trajectory()
+    if reduced:
+        return path[0] if ratio < 0.5 else path[1]
+    var position_on_arc := path[0].lerp(path[1], ratio)
+    var height := clampf(minf(path[0].y, path[1].y) - 18.0, 0.0, 90.0)
+    position_on_arc.y -= height * 4.0 * ratio * (1.0 - ratio)
+    return position_on_arc
 
 func begin(next_phase: String, next_token: int, id: String, reduced_motion: bool) -> void:
     phase = next_phase
@@ -64,17 +91,7 @@ func _draw() -> void:
         return
     var t: float = elapsed / DURATIONS[phase][int(reduced)]
     if phase == "throw" and is_instance_valid(source) and is_instance_valid(target):
-        var inverse := get_global_transform_with_canvas().affine_inverse()
-        var from: Vector2 = inverse * source.throw_origin()
-        var to := inverse * (target.get_global_transform_with_canvas() * (target.size * 0.5))
-        if not correct:
-            to += Vector2(72, 32)
-        var position_on_arc := from.lerp(to, t)
-        if not reduced:
-            position_on_arc.y -= 90.0 * 4.0 * t * (1.0 - t)
-        else:
-            position_on_arc = to
-        draw_set_transform(position_on_arc, t * TAU if not reduced else 0.0)
+        draw_set_transform(projectile_position(t), t * TAU if not reduced else 0.0)
         draw_rect(Rect2(-8, -13, 16, 26), Color("#a87746"))
         draw_polyline(PackedVector2Array([Vector2(-7, 0), Vector2(0, -8), Vector2(7, 0)]), Color("#f5e7c8"), 3.0)
     elif phase == "failure":

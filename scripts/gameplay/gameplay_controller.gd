@@ -32,7 +32,7 @@ const DIFFICULTY_LABELS := {
 @onready var _settings: VBoxContainer = _panels.get_node("Settings")
 @onready var _confirm: VBoxContainer = _panels.get_node("Confirm")
 @onready var _answers = _play.get_node("Answers")
-@onready var _can = _play.get_node("PromptRow/TinCan")
+@onready var _can = _hud.get_node("TinCan")
 @onready var _hint: Label = _play.get_node("Hint")
 @onready var _feedback: VBoxContainer = _play.get_node("Feedback")
 @onready var _effects = $Effects
@@ -57,6 +57,8 @@ var _presentation_token := 0
 var _presented_session := ""
 var _pending_answer := {}
 var _idle_time := 0.0
+var _paused_scroll := 0
+var _restoring_play_scroll := false
 
 func _ready() -> void:
     _button(_menu, "Actions/Play", _show_map.bind(""))
@@ -439,6 +441,8 @@ func _show_settings(origin: String) -> void:
     _settings_origin = origin
     _sync_settings()
     _show("settings", _settings)
+    if not _preferences.storage_error.is_empty():
+        _show_error("Preferences are unavailable: " + _preferences.storage_error)
 
 func _sync_settings() -> void:
     for key in ["music", "effects"]:
@@ -456,7 +460,7 @@ func _change_preference(value: Variant, key: String) -> void:
     _sync_settings()
     _error_label.visible = false
     if not saved:
-        _show_error("The preference could not be saved.")
+        _show_error("The preference could not be saved. " + _preferences.storage_error)
 
 func _back_from_settings() -> void:
     if _view == "settings":
@@ -465,7 +469,7 @@ func _back_from_settings() -> void:
         else:
             _show_menu()
 
-func _show_session() -> void:
+func _show_session(restore_scroll: bool = false) -> void:
     if _recovery_required:
         return
     var session: Variant = snapshot().session
@@ -491,7 +495,7 @@ func _show_session() -> void:
     if _feedback.visible:
         _feedback.get_node("Message").text = "Correct. " + question.explanation if correct else "Miss. Try another answer."
         _feedback.get_node("Acknowledge").text = "Continue" if correct else "Try again"
-    _show("play", _play)
+    _show("play", _play, restore_scroll)
 
 func _update_hud(session: Dictionary) -> void:
     _hud.get_node("Status").text = "Question %d of %d     Score %d     Misses %d / %d" % [
@@ -534,6 +538,7 @@ func _submit_answer(question_id: String, option_id: String) -> void:
     _effects.source = source
     _effects.target = _can
     _effects.correct = committed.feedbackOutcome == "correct"
+    _effects.capture_launch(_scroll)
     _can.stop_idle()
     _begin_phase("throw")
 
@@ -609,6 +614,8 @@ func _acknowledge() -> void:
 
 func _show_pause() -> void:
     if not _committing and _view == "play":
+        if not _restoring_play_scroll:
+            _paused_scroll = _scroll.scroll_vertical
         _apply_layout()
         _show("pause", _pause)
 
@@ -616,9 +623,9 @@ func _resume_pause() -> void:
     if _view != "pause":
         return
     if _effects.phase.is_empty():
-        _show_session()
+        _show_session(true)
     else:
-        _show("play", _play)
+        _show("play", _play, true)
 
 func _replay() -> void:
     if _view in ["pause", "result"] and (_view == "pause" or _effects.phase.is_empty()):
@@ -670,18 +677,32 @@ func _route_summary() -> String:
         routes.append("%s — %s" % [_name(id), info])
     return "\n".join(routes)
 
-func _show(view: String, panel: Control) -> void:
+func _show(view: String, panel: Control, restore_scroll: bool = false) -> void:
     _view = view
     _hud.visible = view == "play"
     for child in _panels.get_children():
         child.visible = child == panel
-    _scroll.scroll_vertical = 0
+    _restoring_play_scroll = restore_scroll and _paused_scroll > 0
+    if _restoring_play_scroll:
+        _restore_play_scroll.call_deferred(_presentation_token)
+    else:
+        _scroll.scroll_vertical = 0
     _suspend_effects()
     view_changed.emit(view)
 
 func _suspend_effects() -> void:
-    _effects.suspended = _backgrounded or _view not in ["play", "result"]
+    _effects.suspended = _backgrounded or _restoring_play_scroll or _view not in ["play", "result"]
     _effects.queue_redraw()
+
+func _restore_play_scroll(token: int) -> void:
+    # The shared ScrollContainer must lay out the visible gameplay panel again
+    # before it can clamp the old offset to the new content height.
+    await get_tree().process_frame
+    if _view != "play" or token != _presentation_token or not _restoring_play_scroll:
+        return
+    _scroll.scroll_vertical = _paused_scroll
+    _restoring_play_scroll = false
+    _suspend_effects()
 
 func _notification(what: int) -> void:
     if not is_node_ready():

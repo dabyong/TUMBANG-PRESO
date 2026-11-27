@@ -45,6 +45,12 @@ func _run() -> void:
                 prefs.remove(filename)
             directory.remove("preferences")
         if directory != null:
+            for child_name in directory.get_directories():
+                if child_name.begins_with("preferences-preserved-"):
+                    var archive := DirAccess.open(folder.path_join(child_name))
+                    for filename in archive.get_files():
+                        archive.remove(filename)
+                    directory.remove(child_name)
             for filename in directory.get_files():
                 directory.remove(filename)
             DirAccess.remove_absolute(folder)

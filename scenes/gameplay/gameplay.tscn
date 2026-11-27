@@ -61,6 +61,9 @@ theme_override_constants/separation = 7
 layout_mode = 2
 visible = false
 
+[node name="TinCan" instance=ExtResource("4") parent="Margin/Frame/HUD" index="0"]
+layout_mode = 2
+
 [node name="Scroll" type="ScrollContainer" parent="Margin/Frame"]
 layout_mode = 2
 size_flags_vertical = 3
@@ -148,9 +151,6 @@ theme_override_constants/separation = 7
 [node name="PromptRow" type="HBoxContainer" parent="Margin/Frame/Scroll/Panels/Play"]
 layout_mode = 2
 theme_override_constants/separation = 14
-
-[node name="TinCan" instance=ExtResource("4") parent="Margin/Frame/Scroll/Panels/Play/PromptRow"]
-layout_mode = 2
 
 [node name="Question" instance=ExtResource("5") parent="Margin/Frame/Scroll/Panels/Play/PromptRow"]
 layout_mode = 2

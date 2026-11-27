@@ -48,6 +48,18 @@ jobs:
           if grep -Eq 'SCRIPT ERROR|^ERROR:' integration.log; then exit 1; fi
       - name: Run Phase 3 record merge acceptance
         run: python3 architecture_tests/phase3_acceptance.py --domain-adapter python3 architecture_tests/phase3_adapter.py
+      - name: Run navigation and presentation integration tests
+        shell: bash
+        run: |
+          timeout 60s godot --headless --path . --script res://tests/ui_navigation_presentation_test.gd 2>&1 | tee navigation.log
+          grep -Eq '^Navigation and presentation checks: [1-9][0-9]* passed, 0 failed$' navigation.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' navigation.log; then exit 1; fi
+      - name: Run settings and recovery integration tests
+        shell: bash
+        run: |
+          timeout 60s godot --headless --path . --script res://tests/ui_settings_recovery_test.gd 2>&1 | tee recovery.log
+          grep -Eq '^Settings and recovery checks: [1-9][0-9]* passed, 0 failed$' recovery.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' recovery.log; then exit 1; fi
       - name: Verify failed assertions fail the job
         shell: bash
         run: |

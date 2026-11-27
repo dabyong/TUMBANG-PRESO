@@ -7,7 +7,7 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_FILES = {
-    "scenes": {".tscn", ".uid"},
+    "scenes": {".tscn", ".tres", ".uid"},
     "scripts": {".gd", ".uid"},
     "content": {".json"},
 }

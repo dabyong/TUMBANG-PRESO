@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[node name="Credits" type="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 9
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 36
+text = "Credits"
+
+[node name="Details" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 20
+text = "Tumbang Preso: Philippine Adventure\nCreated for the Tumbang Preso project. Built with Godot.\n\nBatanes questions draw from Philippine public institutions including the PSA, NHCP, Department of Tourism, and Philippine Information Agency. Source references accompany the question bank.\n\nThe current illustrations and sound controls are placeholders."
+
+[node name="Back" type="Button" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Back"

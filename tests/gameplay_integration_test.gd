@@ -58,6 +58,11 @@ func _run() -> void:
     for path in _paths:
         var directory := DirAccess.open(path)
         if directory != null:
+            var preferences := DirAccess.open(path.path_join("preferences"))
+            if preferences != null:
+                for filename in preferences.get_files():
+                    preferences.remove(filename)
+                directory.remove("preferences")
             for filename in directory.get_files():
                 directory.remove(filename)
             DirAccess.remove_absolute(path)
@@ -69,12 +74,14 @@ func _test_journey(viewport: SubViewport) -> void:
     var boot := _boot(viewport, folder)
     await process_frame
     await process_frame
-    var play_button: Button = boot.get_node("Content/Play")
-    _check(not play_button.disabled, "production boot enables entry")
     var game: Control = boot.get_node("Gameplay")
+    var play_button: Button = game.get_node(PANELS + "Menu/Actions/Play")
+    _check(not play_button.disabled and play_button.is_visible_in_tree(), "production boot enables entry")
     var center := play_button.get_global_rect().get_center()
     _pointer_click(viewport, center)
-    _check(game.visible and game.get_node(PANELS + "Entry").visible, "a mouse click opens the province entry")
+    var arrived_at_map: bool = game.get_node(PANELS + "Map").visible
+    _press(game, PANELS + "Map/Body/Provinces/batanes")
+    _check(arrived_at_map and game.visible and game.get_node(PANELS + "Entry").visible, "a mouse click opens the map and a province can be selected")
     _choose(game, "Normal")
     var initial := _session(game)
     if initial.is_empty():
@@ -169,9 +176,11 @@ func _test_journey(viewport: SubViewport) -> void:
     _check(_session(game) == fresh and game.get_node(PANELS + "Play").visible, "pause and resume leave the snapshot unchanged")
     _press(game, HUD + "Pause")
     _press(game, PANELS + "Pause/Return")
+    _press(game, PANELS + "Map/Body/Provinces/batanes")
     _press(game, PANELS + "Entry/New")
     _check(game.get_node(PANELS + "Difficulty/Notice").text.contains("replaces the active attempt") and _session(game) == fresh, "leaving an active session requires a deliberate new difficulty selection")
     _press(game, PANELS + "Difficulty/Easy")
+    _press(game, PANELS + "Confirm/Accept")
     _check(_session(game).difficulty == "easy" and game.get_node(HINT).visible, "easy starts with a hint")
     for _index in range(5):
         _correct_and_continue(game)
@@ -200,6 +209,7 @@ func _test_write_failure(viewport: SubViewport) -> void:
     var game := Gameplay.instantiate()
     viewport.add_child(game)
     game.configure(repository, _campaign, _catalog)
+    game.get_node("Effects").manual = true
     _choose(game, "Easy")
     var initial := _session(game)
     if initial.is_empty():
@@ -292,15 +302,21 @@ func _boot(viewport: SubViewport, folder: String) -> Control:
     var boot := Boot.instantiate()
     boot.save_directory = folder
     viewport.add_child(boot)
+    boot.get_node("Gameplay/Effects").manual = true
     return boot
 
 func _enter_saved(boot: Control) -> Control:
-    _press(boot, "Content/Play")
     var game: Control = boot.get_node("Gameplay")
+    _press(game, PANELS + "Menu/Actions/Continue")
+    _press(game, PANELS + "Map/Body/Provinces/batanes")
     _press(game, PANELS + "Entry/Resume")
     return game
 
 func _choose(game: Control, difficulty: String) -> void:
+    if game.get_node(PANELS + "Menu").visible:
+        _press(game, PANELS + "Menu/Actions/Play")
+    if game.get_node(PANELS + "Map").visible:
+        _press(game, PANELS + "Map/Body/Provinces/batanes")
     _press(game, PANELS + "Entry/New")
     _press(game, PANELS + "Difficulty/" + difficulty)
 
@@ -328,10 +344,16 @@ func _answer(game: Control, option_id: String) -> void:
     var button := _option(game, option_id)
     if button != null:
         button.pressed.emit()
+    _settle(game)
 
 func _correct_and_continue(game: Control) -> void:
     _answer(game, _correct(_session(game)))
     _press(game, FEEDBACK + "Acknowledge")
+    _settle(game)
+
+func _settle(game: Control) -> void:
+    var effects := game.get_node("Effects")
+    effects.advance(3.0, effects.token)
 
 func _press(game: Control, path: String) -> void:
     game.get_node(path).pressed.emit()

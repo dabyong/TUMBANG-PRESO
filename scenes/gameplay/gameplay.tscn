@@ -11,12 +11,23 @@
 [ext_resource type="PackedScene" path="res://scenes/gameplay/pause.tscn" id="9"]
 [ext_resource type="PackedScene" path="res://scenes/gameplay/result.tscn" id="10"]
 
+[ext_resource type="PackedScene" path="res://scenes/ui/menu.tscn" id="menu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/map.tscn" id="map"]
+[ext_resource type="PackedScene" path="res://scenes/ui/settings.tscn" id="settings"]
+[ext_resource type="PackedScene" path="res://scenes/ui/progress.tscn" id="progress"]
+[ext_resource type="PackedScene" path="res://scenes/ui/credits.tscn" id="credits"]
+[ext_resource type="PackedScene" path="res://scenes/ui/confirm.tscn" id="confirm"]
+[ext_resource type="Theme" path="res://scenes/ui/adventure_theme.tres" id="theme"]
+[ext_resource type="Script" path="res://scripts/ui/island_art.gd" id="art"]
+[ext_resource type="Script" path="res://scripts/gameplay/throw_presentation.gd" id="effects"]
+
 [node name="Gameplay" type="Control"]
 anchors_preset = 15
 anchor_right = 1
 anchor_bottom = 1
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("theme")
 script = ExtResource("1")
 
 [node name="Background" type="ColorRect" parent="."]
@@ -24,7 +35,14 @@ anchors_preset = 15
 anchor_right = 1
 anchor_bottom = 1
 mouse_filter = 2
-color = Color(0.055, 0.10, 0.14, 1)
+color = Color(0.094, 0.18, 0.161, 1)
+
+[node name="Backdrop" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("art")
 
 [node name="Margin" type="MarginContainer" parent="."]
 anchors_preset = 15
@@ -62,6 +80,24 @@ theme_override_font_sizes/font_size = 17
 autowrap_mode = 3
 text = ""
 
+[node name="Menu" instance=ExtResource("menu") parent="Margin/Frame/Scroll/Panels"]
+layout_mode = 2
+
+[node name="Map" instance=ExtResource("map") parent="Margin/Frame/Scroll/Panels"]
+layout_mode = 2
+
+[node name="Settings" instance=ExtResource("settings") parent="Margin/Frame/Scroll/Panels"]
+layout_mode = 2
+
+[node name="Progress" instance=ExtResource("progress") parent="Margin/Frame/Scroll/Panels"]
+layout_mode = 2
+
+[node name="Credits" instance=ExtResource("credits") parent="Margin/Frame/Scroll/Panels"]
+layout_mode = 2
+
+[node name="Confirm" instance=ExtResource("confirm") parent="Margin/Frame/Scroll/Panels"]
+layout_mode = 2
+
 [node name="Entry" type="VBoxContainer" parent="Margin/Frame/Scroll/Panels"]
 layout_mode = 2
 theme_override_constants/separation = 12
@@ -78,6 +114,13 @@ theme_override_font_sizes/font_size = 20
 autowrap_mode = 3
 text = ""
 
+[node name="Illustration" type="Control" parent="Margin/Frame/Scroll/Panels/Entry"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 76)
+mouse_filter = 2
+script = ExtResource("art")
+small = true
+
 [node name="Resume" type="Button" parent="Margin/Frame/Scroll/Panels/Entry"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 50)
@@ -89,6 +132,11 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 50)
 theme_override_font_sizes/font_size = 19
 text = "Choose difficulty"
+
+[node name="Back" type="Button" parent="Margin/Frame/Scroll/Panels/Entry"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Back to map"
 
 [node name="Difficulty" instance=ExtResource("2") parent="Margin/Frame/Scroll/Panels"]
 layout_mode = 2
@@ -144,3 +192,14 @@ layout_mode = 2
 custom_minimum_size = Vector2(0, 50)
 theme_override_font_sizes/font_size = 19
 text = "Check save again"
+
+[node name="Actions" type="VBoxContainer" parent="Margin/Frame/Scroll/Panels/Diagnostic"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Effects" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("effects")

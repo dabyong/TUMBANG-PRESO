@@ -1,5 +1,7 @@
 # Batanes gameplay
 
+This document records the M2.2 implementation and compatibility baseline. The [M2.3 navigation and presentation contract](ui-navigation-animations.md) describes the current screens and recovery controls.
+
 The temporary offline flow is Boot → Batanes entry → Difficulty → Gameplay → Results. The entry offers Resume or View saved result when a session exists. Use the pause menu to resume, explicitly restart, or return to the province entry while preserving the current session. Starting from the difficulty screen warns when the selected difficulty will replace an active attempt. Replay and Retry create a fresh session and carry forward committed records.
 
 The campaign graph unlocks Cagayan after a successful Batanes run on any difficulty. The entry and result screens show that route access separately from question availability. Cagayan and Isabela have empty pools.

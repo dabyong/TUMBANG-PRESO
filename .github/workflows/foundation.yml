@@ -48,6 +48,18 @@ jobs:
           if grep -Eq 'SCRIPT ERROR|^ERROR:' integration.log; then exit 1; fi
       - name: Run Phase 3 record merge acceptance
         run: python3 architecture_tests/phase3_acceptance.py --domain-adapter python3 architecture_tests/phase3_adapter.py
+      - name: Run navigation and presentation integration tests
+        shell: bash
+        run: |
+          timeout 60s godot --headless --path . --script res://tests/ui_navigation_presentation_test.gd 2>&1 | tee navigation.log
+          grep -Eq '^Navigation and presentation checks: [1-9][0-9]* passed, 0 failed$' navigation.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' navigation.log; then exit 1; fi
+      - name: Run settings and recovery integration tests
+        shell: bash
+        run: |
+          timeout 60s godot --headless --path . --script res://tests/ui_settings_recovery_test.gd 2>&1 | tee recovery.log
+          grep -Eq '^Settings and recovery checks: [1-9][0-9]* passed, 0 failed$' recovery.log
+          if grep -Eq 'SCRIPT ERROR|^ERROR:' recovery.log; then exit 1; fi
       - name: Verify failed assertions fail the job
         shell: bash
         run: |
@@ -68,3 +80,48 @@ jobs:
           if grep -Eq 'SCRIPT ERROR|^ERROR:' stage.log; then exit 1; fi
       - name: Run Phase 3 gameplay acceptance
         run: python3 architecture_tests/phase3_acceptance.py --adapter python3 architecture_tests/phase3_adapter.py
+
+  visual-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 2461e25ea50b7643c8b1b99df3b62ec529454bf3
+          path: reviewed-revision
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+      - name: Render reviewed and remediated screens
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          if ! command -v xvfb-run >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y xvfb xauth
+          fi
+          output="$RUNNER_TEMP/m23-evidence"
+          mkdir -p "$output/reviewed-revision-recapture" "$output/remediated"
+          mv reviewed-revision "$RUNNER_TEMP/m23-reviewed-revision"
+          render() {
+            local project="$1" destination="$2" expected="$3"
+            godot --headless --path "$project" --import
+            for suite in ui_navigation_presentation_test ui_settings_recovery_test; do
+              timeout 120s xvfb-run -a -s "-screen 0 1280x720x24" godot --path "$project" --windowed --audio-driver Dummy --script "res://tests/$suite.gd" -- "--capture-dir=$destination" 2>&1 | tee "$destination/$suite.log"
+              grep -Eq 'checks: [1-9][0-9]* passed, 0 failed$' "$destination/$suite.log"
+              if grep -Eq 'SCRIPT ERROR|^ERROR:' "$destination/$suite.log"; then exit 1; fi
+            done
+            test "$(find "$destination" -name '*.png' -type f | wc -l)" -eq "$expected"
+          }
+          render "$RUNNER_TEMP/m23-reviewed-revision" "$output/reviewed-revision-recapture" 19
+          render . "$output/remediated" 25
+          cd "$output"
+          zip -q -r "$RUNNER_TEMP/m23-visual-evidence.zip" reviewed-revision-recapture remediated -i '*.png'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m23-visual-evidence
+          path: ${{ runner.temp }}/m23-visual-evidence.zip
+          if-no-files-found: error

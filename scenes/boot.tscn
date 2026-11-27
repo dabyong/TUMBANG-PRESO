@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/app/boot.gd" id="1_boot"]
+[ext_resource type="Theme" path="res://scenes/ui/adventure_theme.tres" id="2_theme"]
+[ext_resource type="Script" path="res://scripts/ui/island_art.gd" id="3_art"]
 
 [node name="Boot" type="Control"]
 layout_mode = 3
@@ -9,6 +11,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme = ExtResource("2_theme")
 script = ExtResource("1_boot")
 
 [node name="Background" type="ColorRect" parent="."]
@@ -18,7 +21,14 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.08, 0.12, 0.16, 1)
+color = Color(0.094, 0.18, 0.161, 1)
+
+[node name="Backdrop" type="Control" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("3_art")
 
 [node name="Content" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -35,7 +45,7 @@ theme_override_constants/separation = 16
 [node name="Title" type="Label" parent="Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.98, 0.84, 0.46, 1)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 49
 text = "TUMBANG PRESO"
 horizontal_alignment = 1
 
@@ -53,8 +63,9 @@ text = "Loading offline content..."
 horizontal_alignment = 1
 
 [node name="Play" type="Button" parent="Content"]
+visible = false
 layout_mode = 2
 custom_minimum_size = Vector2(0, 52)
-text = "Enter Batanes"
+text = "Play unavailable"
 disabled = true
 

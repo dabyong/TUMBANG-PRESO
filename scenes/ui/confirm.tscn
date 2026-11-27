@@ -1,0 +1,27 @@
+[gd_scene format=3]
+
+[node name="Confirm" type="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 9
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 36
+text = "Confirm decision"
+
+[node name="Details" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 21
+text = ""
+
+[node name="Accept" type="Button" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Confirm"
+
+[node name="Cancel" type="Button" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 48)
+text = "Cancel"

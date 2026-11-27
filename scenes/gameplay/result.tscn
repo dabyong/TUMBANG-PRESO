@@ -16,6 +16,12 @@ theme_override_font_sizes/font_size = 19
 autowrap_mode = 3
 text = ""
 
+[node name="Stars" type="Label" parent="."]
+layout_mode = 2
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 36
+text = ""
+
 [node name="Progress" type="Label" parent="."]
 layout_mode = 2
 theme_override_font_sizes/font_size = 19
@@ -32,4 +38,4 @@ text = "Replay"
 layout_mode = 2
 custom_minimum_size = Vector2(0, 50)
 theme_override_font_sizes/font_size = 19
-text = "Return to province"
+text = "Continue to map"

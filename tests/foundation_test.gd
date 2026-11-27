@@ -33,7 +33,8 @@ func _boot_smoke() -> void:
         return
     scene.save_directory = directory
     root.add_child(scene)
-    _assert(not scene.get_node("Content/Play").disabled and scene.get_node("Content/Status").text == "Offline play available", "bundled content boots offline")
+    var menu := scene.get_node("Gameplay/Margin/Frame/Scroll/Panels/Menu") as Control
+    _assert(menu.visible and not menu.get_node("Actions/Play").disabled and scene.get_node("Content/Status").text == "Offline play available", "bundled content boots offline")
     scene.free()
     DirAccess.remove_absolute(directory)
 
